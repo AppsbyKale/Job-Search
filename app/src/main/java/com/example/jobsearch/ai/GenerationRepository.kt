@@ -94,7 +94,7 @@ class GenerationRepository(
         }
     }
 
-    fun generate(jobId: Long, type: Type, includeQa: Boolean = false, steeringPrompt: String? = null) {
+    fun generate(jobId: Long, type: Type, includeQa: Boolean = false, steeringPrompt: String? = null, coverSteeringPrompt: String? = null) {
         if (_state.value.running) return
         if (!modelManager.isModelDownloaded()) {
             _state.value = State(jobId = jobId, error = "Local AI model not downloaded. Visit Settings.")
@@ -191,7 +191,7 @@ class GenerationRepository(
                     updateProgress("Finalizing documents...", if (type == Type.BOTH) 0.85f else 0.6f)
                     
                     val resumeSource = updated.resumeText.ifBlank { resume }
-                    val coverPrompt = PromptBuilder.coverLetterPrompt(updated, resumeSource)
+                    val coverPrompt = PromptBuilder.coverLetterPrompt(updated, resumeSource, coverSteeringPrompt)
                     Log.d(TAG, "Sending cover letter prompt to Cloud AI...")
                     val coverResult = cloudModelManager.generate(coverPrompt).trim()
 

@@ -424,31 +424,40 @@ fun JobDetailScreen(
 
 @Composable
 fun ResumeSteeringDialog(
-    onConfirm: (String) -> Unit,
+    onConfirm: (String, String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var text by remember { mutableStateOf("") }
+    var resumeText by remember { mutableStateOf("") }
+    var coverText by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Resume Steering") },
+        title = { Text("Document Steering") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    "Optional: Add specific instructions to guide the AI tailoring (e.g., 'Highlight my project management experience' or 'Focus on Python skills').",
+                    "Optional: Add specific instructions to guide the AI tailoring.",
                     style = MaterialTheme.typography.bodySmall
                 )
                 OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    label = { Text("Instructions") },
-                    placeholder = { Text("Leave blank for standard tailoring") },
+                    value = resumeText,
+                    onValueChange = { resumeText = it },
+                    label = { Text("Resume Steering Instructions") },
+                    placeholder = { Text("e.g. 'Highlight project management'") },
                     modifier = Modifier.fillMaxWidth(),
-                    minLines = 3
+                    minLines = 2
+                )
+                OutlinedTextField(
+                    value = coverText,
+                    onValueChange = { coverText = it },
+                    label = { Text("Cover Letter Steering Instructions") },
+                    placeholder = { Text("e.g. 'Focus on culture fit and passion'") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2
                 )
             }
         },
         confirmButton = {
-            Button(onClick = { onConfirm(text) }) {
+            Button(onClick = { onConfirm(resumeText, coverText) }) {
                 Text("Generate")
             }
         },

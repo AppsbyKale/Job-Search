@@ -98,9 +98,12 @@ object PromptBuilder {
         """.trimIndent()
     }
 
-    fun coverLetterPrompt(job: Job, tailoredResume: String): String {
+    fun coverLetterPrompt(job: Job, tailoredResume: String, steeringInstructions: String? = null): String {
         val resume = tailoredResume
         val description = job.description
+        val steering = if (steeringInstructions.isNullOrBlank()) "" else 
+            "\n**USER STEERING INSTRUCTIONS (PRIORITIZE THESE):**\n$steeringInstructions\n"
+
         return """
             ${BASE_SYSTEM}
 
@@ -108,7 +111,7 @@ object PromptBuilder {
 
             Write a tailored cover letter for the candidate. 
             USE THE TAILORED RESUME BELOW AS YOUR SOURCE OF FACTS TO ENSURE 100% CONSISTENCY.
-
+            $steering
             STRICT RULES:
             - Output ONLY raw JSON. No markdown. No conversation.
             - Escape double quotes inside strings with \.

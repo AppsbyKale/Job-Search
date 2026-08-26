@@ -89,7 +89,8 @@ class JobDetailViewModel @Inject constructor(
         val matchResult: MatchResult? = null,
         val matchRunning: Boolean = false,
         val showResumeSteeringDialog: Boolean = false,
-        val resumeSteeringPrompt: String = ""
+        val resumeSteeringPrompt: String = "",
+        val coverSteeringPrompt: String = ""
     )
 
     private val _notice = MutableStateFlow<String?>(null)
@@ -108,6 +109,7 @@ class JobDetailViewModel @Inject constructor(
     private val _matchRunning = MutableStateFlow(false)
     private val _showResumeSteeringDialog = MutableStateFlow(false)
     private val _resumeSteeringPrompt = MutableStateFlow("")
+    private val _coverSteeringPrompt = MutableStateFlow("")
 
     init {
         // Model preloading is handled globally in JobSearchApp
@@ -135,7 +137,8 @@ class JobDetailViewModel @Inject constructor(
         _matchResult,
         _matchRunning,
         _showResumeSteeringDialog,
-        _resumeSteeringPrompt
+        _resumeSteeringPrompt,
+        _coverSteeringPrompt
     ) { args ->
         val job = args[0] as Job?
         val gen = args[1] as GenerationRepository.State
@@ -161,6 +164,7 @@ class JobDetailViewModel @Inject constructor(
         val mRunning = args[19] as Boolean
         val steeringShow = args[20] as Boolean
         val steeringPrompt = args[21] as String
+        val coverSteeringPrompt = args[22] as String
 
         val statusObj = job?.let { JobStatus.fromName(it.status) } ?: JobStatus.SAVED
         val hint = when (statusObj) {
@@ -203,7 +207,8 @@ class JobDetailViewModel @Inject constructor(
             matchResult = mResult,
             matchRunning = mRunning,
             showResumeSteeringDialog = steeringShow,
-            resumeSteeringPrompt = steeringPrompt
+            resumeSteeringPrompt = steeringPrompt,
+            coverSteeringPrompt = coverSteeringPrompt
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState())
 
@@ -229,12 +234,13 @@ class JobDetailViewModel @Inject constructor(
         _showResumeSteeringDialog.value = true
     }
 
-    fun confirmSteering(prompt: String) {
-        _resumeSteeringPrompt.value = prompt
+    fun confirmSteering(resumePrompt: String, coverPrompt: String) {
+        _resumeSteeringPrompt.value = resumePrompt
+        _coverSteeringPrompt.value = coverPrompt
         _showResumeSteeringDialog.value = false
         val type = pendingGenType
         if (type != null) {
-            generate(type, prompt)
+            generationRepository.generate(jobId, type, state.value.useQaAnswers, resumePrompt, coverPrompt)
         }
         pendingGenType = null
     }
