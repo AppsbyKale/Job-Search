@@ -134,7 +134,11 @@ class DocumentViewModel @Inject constructor(
             if (i == index) {
                 val newBullets = exp.bullets.toMutableList()
                 if (bulletIndex < newBullets.size) {
-                    newBullets[bulletIndex] = text
+                    if (text.isEmpty()) {
+                        newBullets.removeAt(bulletIndex)
+                    } else {
+                        newBullets[bulletIndex] = text
+                    }
                 }
                 exp.copy(bullets = newBullets)
             } else exp
@@ -180,7 +184,11 @@ class DocumentViewModel @Inject constructor(
             if (i == index) {
                 val newBullets = proj.bullets.toMutableList()
                 if (bulletIndex < newBullets.size) {
-                    newBullets[bulletIndex] = text
+                    if (text.isEmpty()) {
+                        newBullets.removeAt(bulletIndex)
+                    } else {
+                        newBullets[bulletIndex] = text
+                    }
                 }
                 proj.copy(bullets = newBullets)
             } else proj

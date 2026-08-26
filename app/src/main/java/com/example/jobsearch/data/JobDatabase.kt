@@ -15,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         InterviewReport::class,
         TrainingExample::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class JobDatabase : RoomDatabase() {
@@ -34,11 +34,17 @@ abstract class JobDatabase : RoomDatabase() {
                     JobDatabase::class.java,
                     "jobsearch.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_5_6)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_5_6, MIGRATION_6_7)
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()
                     .also { instance = it }
             }
+
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `jobs` ADD COLUMN `initialEmailText` TEXT NOT NULL DEFAULT ''")
+            }
+        }
 
         private val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
