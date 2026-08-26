@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">JobSearch</string>
+
+    <!-- Common -->
+    <string name="back_button">Back</string>
+    <string name="cancel_button">Cancel</string>
+    <string name="delete_button">Delete</string>
+    <string name="dismiss_button">Dismiss</string>
+    <string name="retry_button">Retry</string>
+    <string name="view_button">View</string>
+    <string name="stop_button">Stop</string>
+    <string name="close_button">Close</string>
+    <string name="more_content_description">More</string>
+    <string name="untitled_job">Untitled job</string>
+    <string name="resume_label">Resume</string>
+    <string name="cover_letter_label">Cover letter</string>
+    <string name="both_label">Both</string>
+    <string name="regenerate_button">Regenerate</string>
+    <string name="generate_now_button">Generate Now</string>
+    <string name="your_answer_placeholder">Your answer...</string>
+    <string name="your_answer_label">Your answer</string>
+    <string name="refresh_button">Refresh</string>
+    <string name="done_button">Done</string>
+
+    <!-- Job List Screen -->
+    <string name="job_search_title">Job Search</string>
+    <string name="add_button">Add</string>
+    <string name="settings_button">Settings</string>
+    <string name="filter_all">All</string>
+    <string name="delete_job_confirm_title">Delete job</string>
+    <string name="delete_job_confirm_message">Delete \"%1$s\"? This cannot be undone.</string>
+    <string name="resume_chip">Resume</string>
+    <string name="cover_chip">Cover</string>
+    <string name="empty_jobs_title">No jobs saved yet</string>
+    <string name="empty_jobs_message">Tap \"Add\" to paste a job posting URL.</string>
+
+    <!-- Job Detail Screen -->
+    <string name="job_details_title">Job details</string>
+    <string name="supplemental_questions_label">Supplemental Questions</string>
+    <string name="practice_interview_label">Practice Interview</string>
+    <string name="interview_cheat_sheet_label">Interview Cheat Sheet</string>
+    <string name="follow_up_email_label">Follow-up Email</string>
+    <string name="generation_failed_title">Generation failed</string>
+    <string name="saved_documents_header">Saved Documents</string>
+    <string name="delete_document_confirm_title">Delete %1$s?</string>
+    <string name="delete_document_confirm_message">This removes the saved %1$s for this job. You can generate it again anytime.</string>
+    <string name="added_label">Added %1$s</string>
+    <string name="job_description_header">Job Description</string>
+    <string name="show_less">Show less</string>
+    <string name="show_more">Show more</string>
+    <string name="status_ready_to_apply">Ready to apply?</string>
+    <string name="status_waiting_feedback">Waiting for feedback</string>
+    <string name="status_good_luck">Good luck with your interviews!</string>
+    <string name="status_congratulations">Congratulations!</string>
+    <string name="status_keep_going">Keep going!</string>
+    <string name="status_stored">Stored.</string>
+    <string name="generation_header">Generation</string>
+    <string name="ai_model_not_downloaded_error">The AI model is not downloaded. Open Settings to download it first.</string>
+    <string name="include_qa_answers_label">Include Q&amp;A answers in generation</string>
+    <string name="supplemental_questions_description">Answer these questions to help the AI tailor your resume and cover letter with real experience facts.</string>
+    <string name="generate_questions_button">Generate Questions</string>
+    <string name="regenerate_questions_button">Regenerate Questions</string>
+    <string name="no_cheat_sheet_message">No cheat sheet generated yet.</string>
+    <string name="follow_up_email_description">Need a follow-up email draft? The AI can write one based on the job and your resume.</string>
+
+    <!-- Add Job Screen -->
+    <string name="add_job_title">Add job</string>
+    <string name="magic_wand_clean_desc">Magic Wand clean</string>
+    <string name="smart_clean_desc">Smart clean</string>
+    <string name="add_job_description">Paste a job posting link and the app will pull the details.</string>
+    <string name="job_url_label">Job posting URL</string>
+    <string name="open_in_browser_button">Open in browser</string>
+    <string name="fetch_builtin_browser_button">Fetch in built-in browser</string>
+    <string name="fetching_label">Fetching...</string>
+    <string name="refetch_button">Re-fetch</string>
+    <string name="fetch_details_button">Fetch details</string>
+    <string name="job_title_label">Job title</string>
+    <string name="company_label">Company</string>
+    <string name="job_description_label">Job description</string>
+    <string name="generate_after_saving_label">Generate after saving:</string>
+    <string name="saving_label">Saving...</string>
+    <string name="save_generate_button">Save &amp; Generate</string>
+    <string name="save_without_generating_button">Save without generating</string>
+    <string name="finalize_generate_button">Finalize &amp; Generate</string>
+    <string name="finalize_without_generating_button">Finalize without generating</string>
+    <string name="generation_tip">Tip: generation runs on this device and takes 1-5 minutes. You can leave the job screen while it works.</string>
+    <string name="job_match_header">Job match</string>
+    <string name="checking_match_label">Checking how well your resume matches this job...</string>
+    <string name="your_resume_label">Your resume</string>
+    <string name="improved_resume_label">Improved resume</string>
+    <string name="improved_resume_saved_note">The improved resume will be saved with this job.</string>
+    <string name="great_match_note">Great match — no resume changes needed.</string>
+    <string name="improve_resume_button">Improve my resume</string>
+    <string name="improved_resume_ready_note">Improved resume ready.</string>
+    <string name="no_resume_error">No resume on file. Add your resume in Settings first.</string>
+    <string name="writing_improvement_questions_label">Writing improvement questions...</string>
+    <string name="creating_improved_resume_label">Creating improved resume...</string>
+    <string name="create_improved_resume_button">Create improved resume</string>
+    <string name="recheck_match_button">Re-check match</string>
+    <string name="check_match_button">Check match</string>
+    <string name="webview_verification_note">If a verification appears, complete it, wait for the job page, then tap Done.</string>
+    <string name="webview_done_hint">The page didn\'t respond yet. Wait a moment and tap Done again, or use Refresh.</string>
+    <string name="webview_verification_hint">Still on the verification page. Complete it, then tap Done.</string>
+    <string name="match_analysis_title">Match Analysis</string>
+    <string name="skills_found_label">Skills Found</string>
+    <string name="skills_missing_label">Skills Missing</string>
+    <string name="generate_questions_for_missing_skills">Generate questions for missing skills</string>
+    <string name="overall_match_score">Overall match score</string>
+    <string name="generating_label">Generating...</string>
+    <string name="view_job_description">View Job Description</string>
+    <string name="match_analysis_label">Match Analysis</string>
+    <string name="generate_resume_label">Generate Resume</string>
+    <string name="generate_cover_letter_label">Generate Cover Letter</string>
+    <string name="generate_both_label">Generate Both</string>
+    <string name="open_in_app">Open in App</string>
+    <string name="open_in_browser">Open in Browser</string>
+    <string name="copy_link">Copy Link</string>
+    <string name="synced_jobs_dialog_title">Synced Jobs</string>
+    <string name="review_required_label">Review Required</string>
+    <string name="no_synced_jobs_message">No jobs waiting for review.</string>
+    <string name="synced_jobs_description">Jobs received from your desktop browser extension appear here for review.</string>
+    <!-- Settings Screen -->
+    <string name="settings_title">Settings</string>
+    <string name="resume_section_title">Your resume</string>
+    <string name="resume_section_description">The AI uses this to tailor documents. Import a TXT, DOCX or PDF, or paste the text.</string>
+    <string name="on_file_label">On file: %1$s</string>
+    <string name="replace_button">Replace</string>
+    <string name="import_button">Import</string>
+    <string name="edit_text_button">Edit Text</string>
+    <string name="model_section_title">AI model</string>
+    <string name="model_section_description">Gemma 4 (~2 GB). Downloaded once and stored in your shared Downloads/AI_Models folder; generation never leaves your phone.</string>
+    <string name="model_ready_label">Model ready (%1$s)</string>
+    <string name="all_files_permission_title">All Files Access Required</string>
+    <string name="all_files_permission_description">To use the AI model from the shared Downloads folder, this app needs "All files access". Tap below to grant it in System Settings.</string>
+    <string name="grant_permission_button">Grant Permission</string>
+    <string name="delete_model_button">Delete model</string>
+    <string name="downloading_model_label">Downloading model...</string>
+    <string name="download_progress_label">%1$s / %2$s (%3$d%%)</string>
+    <string name="downloaded_so_far_label">%1$s downloaded so far</string>
+    <string name="download_warning_description">This takes a few minutes on a good connection. The screen stays on and the download resumes automatically if interrupted.</string>
+    <string name="download_paused_label">Download paused with %1$s saved.</string>
+    <string name="resume_download_button">Resume download</string>
+    <string name="download_model_button">Download model</string>
+    <string name="model_url_label">Model download URL</string>
+    <string name="save_url_button">Save URL</string>
+    <string name="cloud_ai_section_title">Cloud AI (Gemini)</string>
+    <string name="cloud_ai_section_description">Used for high-quality document generation. Requires a Google AI Studio API key.</string>
+    <string name="gemini_api_key_label">Gemini API Key</string>
+    <string name="save_key_button">Save Key</string>
+    <string name="data_privacy_section_title">Data &amp; Privacy</string>
+    <string name="data_privacy_section_description">Manage your data. You can export a full backup of your jobs and settings to move to another device.</string>
+    <string name="backup_data_button">Backup All Data</string>
+    <string name="restore_data_button">Restore Data</string>
+    <string name="export_section_title">Export</string>
+    <string name="export_csv_description">Save the full job list as a CSV file.</string>
+    <string name="export_csv_button">Export CSV</string>
+
+    <string name="training_logging_title">Training Example Logging</string>
+    <string name="training_logging_description">Collect high-quality examples of AI prompts and responses for future fine-tuning (LoRA). All data stays on this device unless you manually export it.</string>
+    <string name="training_logging_toggle">Enable logging</string>
+    <string name="export_training_data_button">Export Training Data (JSONL)</string>
+
+    <!-- Document View Screen -->
+    <string name="preview_button">Preview</string>
+    <string name="edit_button">Edit</string>
+    <string name="saved_to_file_message">Saved to file</string>
+    <string name="save_failed_message">Could not save the file</string>
+    <string name="pdf_preview_failed_message">Could not generate the PDF preview.</string>
+    <string name="pdf_preview_tip">This is exactly how the exported PDF will look. Tap Edit to make changes.</string>
+    <string name="page_number_desc">Page %1$d</string>
+    <string name="share_button">Share</string>
+    <string name="save_to_file_button">Save to file</string>
+    <string name="document_text_label">Document text</string>
+    <string name="unsaved_changes_label">Unsaved changes</string>
+    <string name="save_button">Save</string>
+    <string name="copy_button">Copy</string>
+    <string name="cheat_sheet_title">Cheat Sheet</string>
+    <string name="follow_up_email_title">Follow-up Email</string>
+
+    <!-- Add Job Screen -->
+    <string name="question_format">%1$d. %2$s</string>
+</resources>
