@@ -39,6 +39,7 @@ class GenerationRepository(
     enum class Type(val label: String) {
         RESUME("Tailoring resume..."),
         COVER("Generating cover letter..."),
+        INITIAL_EMAIL("Drafting introductory email..."),
         BOTH("Generating documents..."),
         FOLLOW_UP("Drafting follow-up email..."),
         CHEAT_SHEET("Generating cheat sheet...")
@@ -232,6 +233,29 @@ class GenerationRepository(
                     val headerSource = updated.resumeText.ifBlank { resume }
                     val followUpJson = CoverLetterComposer.compose(result, headerSource, updated)
                     repository.updateJob(updated.copy(followUpEmailText = followUpJson))
+                }
+
+                // Phase 4.5: Initial Email
+                if (type == Type.INITIAL_EMAIL) {
+                    updateProgress("Drafting introductory email...", 0.7f)
+                    val resumeSource = updated.resumeText.ifBlank { resume }
+                    val prompt = PromptBuilder.initialEmailPrompt(updated, resumeSource)
+                    Log.d(TAG, "Sending initial email prompt to Local AI...")
+                    val result = withTimeout(120.seconds) {
+                        modelManager.generate(prompt, source = "Initial Email").trim()
+                    }
+                    if (result.isBlank()) throw IllegalStateException("Failed to generate introductory email.")
+                    
+                    trainingRepository.logExample(
+                        appName = "task",
+                        feature = "initial_email",
+                        inputPrompt = prompt,
+                        modelOutput = result
+                    )
+
+                    val headerSource = updated.resumeText.ifBlank { resume }
+                    val initialJson = CoverLetterComposer.compose(result, headerSource, updated)
+                    repository.updateJob(updated.copy(initialEmailText = initialJson))
                 }
 
                 _state.value = State()

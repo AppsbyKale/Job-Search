@@ -405,6 +405,32 @@ object PromptBuilder {
         """.trimIndent()
     }
 
+    fun initialEmailPrompt(job: Job, resumeText: String): String {
+        val resume = truncateWords(resumeText, MAX_RESUME_WORDS)
+        val description = truncateWords(job.description, MAX_JOB_WORDS)
+        return """
+            $BASE_SYSTEM
+            Write an introductory email for the candidate to send alongside their resume and cover letter when applying for the role below.
+            
+            STRICT RULES:
+            - Keep it welcoming, introductory, and professional. Mention that the resume and cover letter are attached for review.
+            - Output ONLY the email body text.
+            - No subject line, no placeholders like "[Name]", use real names from resume/job if available.
+
+            <CANDIDATE RESUME>
+            $resume
+
+            <JOB TITLE>
+            ${job.title}
+
+            <COMPANY>
+            ${truncateWords(job.company, MAX_COMPANY_WORDS)}
+
+            <JOB DESCRIPTION>
+            $description
+        """.trimIndent()
+    }
+
     fun followUpEmailPrompt(job: Job, resumeText: String): String {
         val resume = truncateWords(resumeText, MAX_RESUME_WORDS)
         val description = truncateWords(job.description, MAX_JOB_WORDS)

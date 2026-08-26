@@ -14,12 +14,14 @@ data class Job(
     val status: String = JobStatus.SAVED.name,
     val resumeText: String = "",
     val coverLetterText: String = "",
+    val initialEmailText: String = "",
     val cheatSheetText: String = "",
     val followUpEmailText: String = "",
     val notes: String = ""
 ) {
     val hasResume: Boolean get() = resumeText.isNotBlank()
     val hasCoverLetter: Boolean get() = coverLetterText.isNotBlank()
+    val hasInitialEmail: Boolean get() = initialEmailText.isNotBlank()
     val hasCheatSheet: Boolean get() = cheatSheetText.isNotBlank()
     val hasFollowUpEmail: Boolean get() = followUpEmailText.isNotBlank()
     val hasNotes: Boolean get() = notes.isNotBlank()

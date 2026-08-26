@@ -19,8 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.ClipEntry
-import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
@@ -55,7 +54,7 @@ fun JobDetailScreen(
     val job = state.job
     var menuExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    val clipboard = LocalClipboard.current
+    val clipboardManager = LocalClipboardManager.current
 
     var pendingPdfText by remember { mutableStateOf<String?>(null) }
     var pendingPdfType by remember { mutableStateOf<String?>(null) }
@@ -150,6 +149,13 @@ fun JobDetailScreen(
                             onClick = {
                                 menuExpanded = false
                                 viewModel.showSupplemental(true)
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Initial Application Email") },
+                            onClick = {
+                                menuExpanded = false
+                                viewModel.showInitialEmail(true)
                             }
                         )
                         DropdownMenuItem(
@@ -280,6 +286,15 @@ fun JobDetailScreen(
                         onDelete = { viewModel.deleteDocument("followup") }
                     )
                 }
+                if (job.hasInitialEmail) {
+                    DocumentItemCard(
+                        title = "Initial Application Email",
+                        text = getDisplayPreview(job.initialEmailText, isResume = false),
+                        onView = { onViewDocument(job.id, "initial", false) },
+                        onEdit = { onViewDocument(job.id, "initial", true) },
+                        onDelete = { viewModel.deleteDocument("initial") }
+                    )
+                }
                 if (job.hasNotes) {
                     DocumentItemCard(
                         title = "Research Notes",
@@ -304,6 +319,26 @@ fun JobDetailScreen(
         )
     }
 
+    if (state.showInitialEmailDialog) {
+        InitialEmailDialog(
+            job = job,
+            running = state.generationType == com.example.jobsearch.ai.GenerationRepository.Type.INITIAL_EMAIL,
+            progress = state.generationProgress,
+            progressText = state.generationProgressText,
+            onGenerate = viewModel::generateInitialEmail,
+            onCopy = { text -> clipboardManager.setText(AnnotatedString(text)) },
+            onOpenGmail = { text ->
+                val intent = Intent(Intent.ACTION_SENDTO).apply {
+                    data = Uri.parse("mailto:")
+                    putExtra(Intent.EXTRA_SUBJECT, "Application: ${job?.title} at ${job?.company}")
+                    putExtra(Intent.EXTRA_TEXT, text)
+                }
+                context.startActivity(Intent.createChooser(intent, "Open in Gmail"))
+            },
+            onDismiss = { viewModel.showInitialEmail(false) }
+        )
+    }
+
     if (state.showCheatSheetDialog) {
         CheatSheetDialog(
             job = job,
@@ -311,7 +346,7 @@ fun JobDetailScreen(
             progress = state.generationProgress,
             progressText = state.generationProgressText,
             onGenerate = viewModel::generateCheatSheet,
-            onCopy = { text -> clipboard.setClip(ClipEntry(ClipData.newPlainText("CheatSheet", text))) },
+            onCopy = { text -> clipboardManager.setText(AnnotatedString(text)) },
             onExportPdf = { text ->
                 pendingPdfText = text
                 pendingPdfType = "cheat"
@@ -328,7 +363,7 @@ fun JobDetailScreen(
             progress = state.generationProgress,
             progressText = state.generationProgressText,
             onGenerate = viewModel::generateFollowUpEmail,
-            onCopy = { text -> clipboard.setClip(ClipEntry(ClipData.newPlainText("FollowUp", text))) },
+            onCopy = { text -> clipboardManager.setText(AnnotatedString(text)) },
             onOpenGmail = { text ->
                 val intent = Intent(Intent.ACTION_SENDTO).apply {
                     data = Uri.parse("mailto:")
@@ -487,7 +522,7 @@ private fun LinkAndStatusSection(state: JobDetailViewModel.UiState, viewModel: J
     var urlMenuExpanded by remember { mutableStateOf(false) }
     var showWebViewDialog by remember { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
-    val clipboard = LocalClipboard.current
+    val clipboardManager = LocalClipboardManager.current
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -530,7 +565,7 @@ private fun LinkAndStatusSection(state: JobDetailViewModel.UiState, viewModel: J
                         text = { Text(stringResource(R.string.copy_link)) },
                         onClick = {
                             urlMenuExpanded = false
-                            clipboard.setClip(ClipEntry(ClipData.newPlainText("JobURL", job.url)))
+                            clipboardManager.setText(AnnotatedString(job.url))
                         },
                         leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) }
                     )

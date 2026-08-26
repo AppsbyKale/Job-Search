@@ -7,6 +7,7 @@ import androidx.core.app.NotificationCompat
 import android.net.NetworkCapabilities
 import android.util.Log
 import com.example.jobsearch.R
+import com.example.jobsearch.ai.IModelManager
 import com.example.jobsearch.parsing.JobParser
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
@@ -26,7 +27,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerializationException
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.util.concurrent.TimeUnit
@@ -55,7 +55,7 @@ class SyncRepository @Inject constructor(
     private val context: Context,
     private val jobRepository: JobRepository,
     private val trainingRepository: TrainingRepository,
-    private val modelManager: com.example.jobsearch.ai.IModelManager,
+    private val modelManager: IModelManager,
     private val parser: JobParser,
     private val systemLog: SystemLogRepository
 ) {

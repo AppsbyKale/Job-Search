@@ -73,6 +73,7 @@ class JobDetailViewModel @Inject constructor(
         val useQaAnswers: Boolean = false,
         val notice: String? = null,
         val showSupplementalDialog: Boolean = false,
+        val showInitialEmailDialog: Boolean = false,
         val showCheatSheetDialog: Boolean = false,
         val showFollowUpDialog: Boolean = false,
         val showMatchAnalysisDialog: Boolean = false,
@@ -94,6 +95,7 @@ class JobDetailViewModel @Inject constructor(
     private val _notice = MutableStateFlow<String?>(null)
     private val _useQaAnswers = MutableStateFlow(false)
     private val _showSupplementalDialog = MutableStateFlow(false)
+    private val _showInitialEmailDialog = MutableStateFlow(false)
     private val _showCheatSheetDialog = MutableStateFlow(false)
     private val _showFollowUpDialog = MutableStateFlow(false)
     private val _showMatchAnalysisDialog = MutableStateFlow(false)
@@ -118,6 +120,7 @@ class JobDetailViewModel @Inject constructor(
         _useQaAnswers,
         _notice,
         _showSupplementalDialog,
+        _showInitialEmailDialog,
         _showCheatSheetDialog,
         _showFollowUpDialog,
         _showMatchAnalysisDialog,
@@ -140,23 +143,24 @@ class JobDetailViewModel @Inject constructor(
         val useQa = args[3] as Boolean
         val notice = args[4] as String?
         val supp = args[5] as Boolean
-        val cheat = args[6] as Boolean
-        val follow = args[7] as Boolean
-        val matchAnalysis = args[8] as Boolean
-        val jobDesc = args[9] as Boolean
-        val showInterview = args[10] as Boolean
-        val showAskAi = args[11] as Boolean
-        val showNotes = args[12] as Boolean
+        val initialEmailShow = args[6] as Boolean
+        val cheat = args[7] as Boolean
+        val follow = args[8] as Boolean
+        val matchAnalysis = args[9] as Boolean
+        val jobDesc = args[10] as Boolean
+        val showInterview = args[11] as Boolean
+        val showAskAi = args[12] as Boolean
+        val showNotes = args[13] as Boolean
         @Suppress("UNCHECKED_CAST")
-        val questions = args[13] as List<InterviewQuestion>
+        val questions = args[14] as List<InterviewQuestion>
         @Suppress("UNCHECKED_CAST")
-        val answers = args[14] as List<InterviewAnswer>
-        val qRunning = args[15] as Boolean
-        // args[16] is downloadProgress
-        val mResult = args[17] as MatchResult?
-        val mRunning = args[18] as Boolean
-        val steeringShow = args[19] as Boolean
-        val steeringPrompt = args[20] as String
+        val answers = args[15] as List<InterviewAnswer>
+        val qRunning = args[16] as Boolean
+        // args[17] is downloadProgress
+        val mResult = args[18] as MatchResult?
+        val mRunning = args[19] as Boolean
+        val steeringShow = args[20] as Boolean
+        val steeringPrompt = args[21] as String
 
         val statusObj = job?.let { JobStatus.fromName(it.status) } ?: JobStatus.SAVED
         val hint = when (statusObj) {
@@ -183,6 +187,7 @@ class JobDetailViewModel @Inject constructor(
             useQaAnswers = useQa,
             notice = notice,
             showSupplementalDialog = supp,
+            showInitialEmailDialog = initialEmailShow,
             showCheatSheetDialog = cheat,
             showFollowUpDialog = follow,
             showMatchAnalysisDialog = matchAnalysis,
@@ -255,11 +260,23 @@ class JobDetailViewModel @Inject constructor(
             "resume" -> job.copy(resumeText = "")
             "cheat" -> job.copy(cheatSheetText = "")
             "followup" -> job.copy(followUpEmailText = "")
+            "initial" -> job.copy(initialEmailText = "")
             else -> job.copy(coverLetterText = "")
         }
         viewModelScope.launch { repository.updateJob(updated) }
     }
 
+    fun generateInitialEmail() {
+        val s = state.value
+        if (s.generating != null) return
+        if (!s.modelReady) {
+            _notice.value = "The AI model is not downloaded yet. Go to Settings and download it first."
+            return
+        }
+        generationRepository.generate(jobId, GenerationRepository.Type.INITIAL_EMAIL)
+    }
+
+    fun showInitialEmail(show: Boolean) { _showInitialEmailDialog.value = show }
     fun showSupplemental(show: Boolean) { _showSupplementalDialog.value = show }
     fun showCheatSheet(show: Boolean) { _showCheatSheetDialog.value = show }
     fun showFollowUp(show: Boolean) { _showFollowUpDialog.value = show }
