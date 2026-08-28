@@ -209,6 +209,20 @@ fun AddJobScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
+            if (state.tags.isNotBlank()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    state.tags.split(",").map { it.trim() }.filter { it.isNotBlank() }.forEach { tag ->
+                        SuggestionChip(
+                            onClick = { },
+                            label = { Text(tag) }
+                        )
+                    }
+                }
+            }
+
             if (state.smartCleaning) {
                 AppCard(modifier = Modifier.fillMaxWidth()) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(8.dp)) {

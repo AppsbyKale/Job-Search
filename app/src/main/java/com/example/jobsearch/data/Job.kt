@@ -17,7 +17,10 @@ data class Job(
     val initialEmailText: String = "",
     val cheatSheetText: String = "",
     val followUpEmailText: String = "",
-    val notes: String = ""
+    val notes: String = "",
+    val externalResumeText: String = "",
+    val externalCoverLetterText: String = "",
+    val tags: String = ""
 ) {
     val hasResume: Boolean get() = resumeText.isNotBlank()
     val hasCoverLetter: Boolean get() = coverLetterText.isNotBlank()
@@ -25,4 +28,8 @@ data class Job(
     val hasCheatSheet: Boolean get() = cheatSheetText.isNotBlank()
     val hasFollowUpEmail: Boolean get() = followUpEmailText.isNotBlank()
     val hasNotes: Boolean get() = notes.isNotBlank()
+    val hasExternalResume: Boolean get() = externalResumeText.isNotBlank()
+    val hasExternalCoverLetter: Boolean get() = externalCoverLetterText.isNotBlank()
+
+    val tagList: List<String> get() = tags.split(",").map { it.trim() }.filter { it.isNotBlank() }
 }

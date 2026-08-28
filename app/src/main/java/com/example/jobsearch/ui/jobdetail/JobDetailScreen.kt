@@ -17,6 +17,7 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -53,6 +54,7 @@ fun JobDetailScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val job = state.job
     var menuExpanded by remember { mutableStateOf(false) }
+    var showTagEditor by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
 
@@ -159,6 +161,13 @@ fun JobDetailScreen(
                             }
                         )
                         DropdownMenuItem(
+                            text = { Text("Upload External Doc") },
+                            onClick = {
+                                menuExpanded = false
+                                viewModel.showExternalUpload(true)
+                            }
+                        )
+                        DropdownMenuItem(
                             text = { Text(stringResource(R.string.practice_interview_label)) },
                             onClick = {
                                 menuExpanded = false
@@ -231,6 +240,32 @@ fun JobDetailScreen(
                     onShowMatch = { viewModel.showMatchAnalysis(true) },
                     onViewDescription = { viewModel.showJobDescription(true) }
                 )
+
+                if (job.tags.isNotBlank()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable { showTagEditor = true },
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        job.tagList.forEach { tag ->
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = tag,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    TextButton(onClick = { showTagEditor = true }) {
+                        Text("+ Add Tags", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
                 
                 LinkAndStatusSection(state, viewModel)
 
@@ -303,6 +338,28 @@ fun JobDetailScreen(
                         onEdit = { viewModel.showNotes(true) },
                         onDelete = { viewModel.updateNotes("") }
                     )
+                }
+
+                if (job.hasExternalResume || job.hasExternalCoverLetter) {
+                    SectionHeader("External Documents")
+                    if (job.hasExternalResume) {
+                        DocumentItemCard(
+                            title = "External Resume",
+                            text = getDisplayPreview(job.externalResumeText, isResume = true),
+                            onView = { onViewDocument(job.id, "external_resume", false) },
+                            onEdit = { onViewDocument(job.id, "external_resume", true) },
+                            onDelete = { viewModel.saveExternalDocument("resume", "") }
+                        )
+                    }
+                    if (job.hasExternalCoverLetter) {
+                        DocumentItemCard(
+                            title = "External Cover Letter",
+                            text = getDisplayPreview(job.externalCoverLetterText, isResume = false),
+                            onView = { onViewDocument(job.id, "external_cover", false) },
+                            onEdit = { onViewDocument(job.id, "external_cover", true) },
+                            onDelete = { viewModel.saveExternalDocument("cover", "") }
+                        )
+                    }
                 }
             }
         }
@@ -414,12 +471,144 @@ fun JobDetailScreen(
         )
     }
 
+    if (state.showExternalUploadDialog) {
+        ExternalUploadDialog(
+            onUpload = viewModel::saveExternalDocument,
+            onDismiss = { viewModel.showExternalUpload(false) }
+        )
+    }
+
     if (state.showResumeSteeringDialog) {
         ResumeSteeringDialog(
             onConfirm = viewModel::confirmSteering,
             onDismiss = viewModel::dismissSteering
         )
     }
+
+    if (showTagEditor) {
+        TagEditorDialog(
+            initialTags = job?.tags ?: "",
+            onSave = {
+                viewModel.updateTags(it)
+                showTagEditor = false
+            },
+            onDismiss = { showTagEditor = false }
+        )
+    }
+}
+
+@Composable
+fun TagEditorDialog(
+    initialTags: String,
+    onSave: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var text by remember { mutableStateOf(initialTags) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Tags") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Enter tags separated by commas.", style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text("Tags") },
+                    placeholder = { Text("Android, AI, Remote") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onSave(text) }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+fun ExternalUploadDialog(
+    onUpload: (type: String, text: String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var selectedType by remember { mutableStateOf("resume") }
+    var uploading by remember { mutableStateOf(false) }
+
+    val picker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            uploading = true
+            scope.launch {
+                try {
+                    val resolver = context.contentResolver
+                    val fileName = resolver.query(uri, null, null, null, null)?.use { cursor ->
+                        val index = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                        if (index != -1 && cursor.moveToFirst()) cursor.getString(index) else "document"
+                    } ?: "document"
+                    
+                    val text = resolver.openInputStream(uri)?.use { stream ->
+                        com.example.jobsearch.resume.ResumeImporter().parse(context, fileName, stream)
+                    } ?: ""
+                    
+                    if (text.isNotBlank()) {
+                        onUpload(selectedType, text)
+                        Toast.makeText(context, "Uploaded $selectedType", Toast.LENGTH_SHORT).show()
+                        onDismiss()
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Import failed: ${e.message}", Toast.LENGTH_LONG).show()
+                } finally {
+                    uploading = false
+                }
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Upload External Document") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("Select the type of document you want to attach to this job tracking record.")
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = selectedType == "resume", onClick = { selectedType = "resume" })
+                    Text("Resume", modifier = Modifier.clickable { selectedType = "resume" })
+                    Spacer(Modifier.width(16.dp))
+                    RadioButton(selected = selectedType == "cover", onClick = { selectedType = "cover" })
+                    Text("Cover Letter", modifier = Modifier.clickable { selectedType = "cover" })
+                }
+
+                if (uploading) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    picker.launch(arrayOf("application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"))
+                },
+                enabled = !uploading
+            ) {
+                Text("Choose File")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable

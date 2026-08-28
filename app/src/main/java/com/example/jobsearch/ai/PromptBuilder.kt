@@ -48,6 +48,16 @@ object PromptBuilder {
         """.trimIndent()
     }
 
+    fun taggingPrompt(title: String, description: String): String {
+        return """
+            Categorize this job posting into 2-4 short, professional tags (e.g., "Android", "AI", "Project Management", "Remote"). 
+            Output ONLY the tags as a comma-separated list. No intro, no fluff.
+            
+            JOB TITLE: $title
+            DESC: ${truncateWords(description, 150)}
+        """.trimIndent()
+    }
+
     fun resumePrompt(
         job: Job,
         resumeText: String,

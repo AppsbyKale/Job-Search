@@ -56,23 +56,26 @@ class DocumentViewModel @Inject constructor(
                 "resume" -> job?.resumeText
                 "cheat" -> job?.cheatSheetText
                 "followup" -> job?.followUpEmailText
+                "initial" -> job?.initialEmailText
+                "external_resume" -> job?.externalResumeText
+                "external_cover" -> job?.externalCoverLetterText
                 else -> job?.coverLetterText
             }
             
             val displayLines = if (rawText != null) {
                 when (type) {
-                    "resume" -> ResumeData.fromJson(rawText)?.toHumanReadableText() ?: rawText
+                    "resume", "external_resume" -> ResumeData.fromJson(rawText)?.toHumanReadableText() ?: rawText
                     "cheat" -> {
                         CheatSheetData.fromJson(rawText)?.toHumanReadableText() ?: rawText
                     }
-                    "followup" -> rawText
+                    "followup", "initial" -> rawText
                     else -> CoverLetterData.fromJson(rawText)?.toHumanReadableText() ?: rawText
                 }
             } else {
                 null
             }
 
-            val resumeData = if (type == "resume" && rawText != null) {
+            val resumeData = if ((type == "resume" || type == "external_resume") && rawText != null) {
                 ResumeData.fromJson(rawText) ?: ResumeData.fromText(rawText)
             } else null
 
@@ -205,6 +208,9 @@ class DocumentViewModel @Inject constructor(
                 "resume" -> job.copy(resumeText = textToSave)
                 "cheat" -> job.copy(cheatSheetText = textToSave)
                 "followup" -> job.copy(followUpEmailText = textToSave)
+                "initial" -> job.copy(initialEmailText = textToSave)
+                "external_resume" -> job.copy(externalResumeText = textToSave)
+                "external_cover" -> job.copy(externalCoverLetterText = textToSave)
                 else -> job.copy(coverLetterText = textToSave)
             }
             repository.updateJob(saved)
@@ -257,10 +263,10 @@ class DocumentViewModel @Inject constructor(
 
     private fun prepareTextForProcessing(currentText: String, tag: String): String {
         return when (type) {
-            "resume" -> {
+            "resume", "external_resume" -> {
                 val data = ResumeData.fromText(currentText)
                 val substantial = data.isSubstantial()
-                Log.d("JobSearch", "DocumentViewModel.$tag: type=resume, substantial=$substantial")
+                Log.d("JobSearch", "DocumentViewModel.$tag: type=$type, substantial=$substantial")
                 if (substantial) data.toJson() else currentText
             }
             "cheat" -> {
@@ -268,11 +274,11 @@ class DocumentViewModel @Inject constructor(
                 Log.d("JobSearch", "DocumentViewModel.$tag: type=cheat")
                 data.toJson()
             }
-            "followup" -> currentText
+            "followup", "initial" -> currentText
             else -> {
                 val data = CoverLetterData.fromText(currentText)
                 val substantial = data.isSubstantial()
-                Log.d("JobSearch", "DocumentViewModel.$tag: type=cover_letter, substantial=$substantial")
+                Log.d("JobSearch", "DocumentViewModel.$tag: type=$type, substantial=$substantial")
                 if (substantial) data.toJson() else currentText
             }
         }

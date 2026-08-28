@@ -62,6 +62,7 @@ class AddJobViewModel @Inject constructor(
         val improving: Boolean = false,
         val improvedResume: String = "",
         val smartCleaning: Boolean = false,
+        val tags: String = "",
         val trainingLoggingEnabled: Boolean = false
     )
 
@@ -231,20 +232,31 @@ class AddJobViewModel @Inject constructor(
         _state.update { it.copy(smartCleaning = true) }
         viewModelScope.launch {
             try {
-                Log.d(TAG, "Auto-sweeping job description with Local AI...")
-                val prompt = PromptBuilder.smartCleanPrompt(rawDesc)
-                val cleaned = modelManager.generate(prompt, source = "Manual Auto-Sweep").trim()
+                Log.d(TAG, "Auto-sweeping and tagging job description with Local AI...")
+                
+                // 1. Smart Clean
+                val cleanPrompt = PromptBuilder.smartCleanPrompt(rawDesc)
+                val cleaned = modelManager.generate(cleanPrompt, source = "Auto-Sweep").trim()
+                
+                // 2. Tagging
+                val tagPrompt = PromptBuilder.taggingPrompt(_state.value.title, rawDesc)
+                val tags = modelManager.generate(tagPrompt, source = "Auto-Tagging").trim()
+
+                _state.update { 
+                    it.copy(
+                        description = if (cleaned.isNotBlank()) cleaned else it.description,
+                        tags = if (tags.isNotBlank()) tags else it.tags
+                    ) 
+                }
+
                 if (cleaned.isNotBlank()) {
-                    _state.update { it.copy(description = cleaned) }
-                    trainingRepository.logExample(
-                        appName = "task",
-                        feature = "auto_sweep",
-                        inputPrompt = prompt,
-                        modelOutput = cleaned
-                    )
+                    trainingRepository.logExample("task", "auto_sweep", cleanPrompt, cleaned)
+                }
+                if (tags.isNotBlank()) {
+                    trainingRepository.logExample("task", "auto_tagging", tagPrompt, tags)
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Auto-sweep failed: ${e.message}")
+                Log.e(TAG, "Auto-sweep/tag failed: ${e.message}")
             } finally {
                 _state.update { it.copy(smartCleaning = false) }
             }

@@ -93,28 +93,42 @@ class SyncRepository @Inject constructor(
                         Log.i("SyncServer", "Received job request: ${sharedJob.title}")
                         systemLog.log("Sync: Received job '${sharedJob.title}' from desktop.")
                         
+                        var cleanedDesc = parser.trimFluff(sharedJob.description)
+                        var jobTags = ""
+                        
+                        if (modelManager.isModelDownloaded()) {
+                            try {
+                                systemLog.log("Sync: Auto-sweeping and tagging job...")
+                                
+                                // 1. Clean
+                                val cleanPrompt = com.example.jobsearch.ai.PromptBuilder.smartCleanPrompt(cleanedDesc)
+                                val cleaned = modelManager.generate(cleanPrompt, source = "Sync Auto-Sweep").trim()
+                                if (cleaned.isNotBlank()) {
+                                    trainingRepository.logExample("task", "auto_sweep_sync", cleanPrompt, cleaned)
+                                    cleanedDesc = cleaned
+                                }
+
+                                // 2. Tag
+                                val tagPrompt = com.example.jobsearch.ai.PromptBuilder.taggingPrompt(sharedJob.title, sharedJob.description)
+                                val tags = modelManager.generate(tagPrompt, source = "Sync Auto-Tagging").trim()
+                                if (tags.isNotBlank()) {
+                                    trainingRepository.logExample("task", "auto_tagging_sync", tagPrompt, tags)
+                                    jobTags = tags
+                                }
+                            } catch (e: Exception) {
+                                Log.e("SyncServer", "AI Sweep/Tag failed", e)
+                            }
+                        }
+
                         val job = Job(
                             title = sharedJob.title,
                             company = sharedJob.company,
                             url = sharedJob.url,
-                            description = try { 
-                                val raw = parser.trimFluff(sharedJob.description)
-                                if (modelManager.isModelDownloaded()) {
-                                    systemLog.log("Sync: Auto-sweeping job description...")
-                                    val prompt = com.example.jobsearch.ai.PromptBuilder.smartCleanPrompt(raw)
-                                    val cleaned = modelManager.generate(prompt, source = "Sync Auto-Sweep").trim()
-                                    if (cleaned.isNotBlank()) {
-                                        trainingRepository.logExample("task", "auto_sweep_sync", prompt, cleaned)
-                                        cleaned
-                                    } else raw
-                                } else raw
-                            } catch(e: Exception) { 
-                                Log.e("SyncServer", "Auto-sweep failed, using raw description", e)
-                                sharedJob.description 
-                            },
+                            description = cleanedDesc,
                             dateAdded = System.currentTimeMillis(),
                             status = JobStatus.SYNCED.name,
-                            notes = sharedJob.notes ?: ""
+                            notes = sharedJob.notes ?: "",
+                            tags = jobTags
                         )
                         Log.d("SyncServer", "Saving job to database...")
                         val id = try {

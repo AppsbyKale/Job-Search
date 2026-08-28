@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
@@ -177,6 +178,9 @@ fun JobListScreen(
                 showSyncedJobsDialog = false
                 onAddJobWithId(id)
             },
+            onDeleteJob = { id ->
+                viewModel.deleteJob(id)
+            },
             onDismiss = { showSyncedJobsDialog = false }
         )
     }
@@ -204,6 +208,7 @@ fun JobListScreen(
 private fun SyncedJobsDialog(
     syncedJobs: List<Job>,
     onReviewJob: (Long) -> Unit,
+    onDeleteJob: (Long) -> Unit,
     onDismiss: () -> Unit
 ) {
     Dialog(
@@ -253,7 +258,8 @@ private fun SyncedJobsDialog(
                         items(syncedJobs, key = { "dialog_synced_${it.id}" }) { job ->
                             SyncedJobCard(
                                 job = job,
-                                onClick = { onReviewJob(job.id) }
+                                onClick = { onReviewJob(job.id) },
+                                onDelete = { onDeleteJob(job.id) }
                             )
                         }
                     }
@@ -266,7 +272,8 @@ private fun SyncedJobsDialog(
 @Composable
 private fun SyncedJobCard(
     job: Job,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onDelete: () -> Unit
 ) {
     AppCard(
         onClick = onClick,
@@ -276,13 +283,14 @@ private fun SyncedJobCard(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                Icons.Default.Sync,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(Modifier.width(12.dp))
+            IconButton(onClick = onDelete) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = stringResource(R.string.delete_button),
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
+            Spacer(Modifier.width(4.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = job.title.ifBlank { "Synced Job" },
@@ -301,10 +309,11 @@ private fun SyncedJobCard(
                 }
             }
             Spacer(Modifier.width(8.dp))
-            Text(
-                "Review",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary
+            Icon(
+                Icons.Default.Sync,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
             )
         }
     }

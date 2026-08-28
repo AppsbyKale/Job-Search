@@ -42,6 +42,7 @@ class JobDetailViewModel @Inject constructor(
     private val modelManager: IModelManager,
     private val settingsRepository: SettingsRepository,
     private val generationRepository: GenerationRepository,
+    private val trainingRepository: com.example.jobsearch.data.TrainingRepository,
     private val exporter: com.example.jobsearch.document.DocumentExporter,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -81,6 +82,7 @@ class JobDetailViewModel @Inject constructor(
         val showInterviewDialog: Boolean = false,
         val showAskAiQuestionDialog: Boolean = false,
         val showNotesDialog: Boolean = false,
+        val showExternalUploadDialog: Boolean = false,
         val questions: List<InterviewQuestion> = emptyList(),
         val answers: List<InterviewAnswer> = emptyList(),
         val questionsRunning: Boolean = false,
@@ -104,6 +106,7 @@ class JobDetailViewModel @Inject constructor(
     private val _showInterviewDialog = MutableStateFlow(false)
     private val _showAskAiQuestionDialog = MutableStateFlow(false)
     private val _showNotesDialog = MutableStateFlow(false)
+    private val _showExternalUploadDialog = MutableStateFlow(false)
     private val _questionsRunning = MutableStateFlow(false)
     private val _matchResult = MutableStateFlow<MatchResult?>(null)
     private val _matchRunning = MutableStateFlow(false)
@@ -130,6 +133,7 @@ class JobDetailViewModel @Inject constructor(
         _showInterviewDialog,
         _showAskAiQuestionDialog,
         _showNotesDialog,
+        _showExternalUploadDialog,
         interviewRepository.observeQuestions(jobId),
         interviewRepository.observeAnswers(jobId),
         _questionsRunning,
@@ -154,17 +158,18 @@ class JobDetailViewModel @Inject constructor(
         val showInterview = args[11] as Boolean
         val showAskAi = args[12] as Boolean
         val showNotes = args[13] as Boolean
+        val externalUploadShow = args[14] as Boolean
         @Suppress("UNCHECKED_CAST")
-        val questions = args[14] as List<InterviewQuestion>
+        val questions = args[15] as List<InterviewQuestion>
         @Suppress("UNCHECKED_CAST")
-        val answers = args[15] as List<InterviewAnswer>
-        val qRunning = args[16] as Boolean
-        // args[17] is downloadProgress
-        val mResult = args[18] as MatchResult?
-        val mRunning = args[19] as Boolean
-        val steeringShow = args[20] as Boolean
-        val steeringPrompt = args[21] as String
-        val coverSteeringPrompt = args[22] as String
+        val answers = args[16] as List<InterviewAnswer>
+        val qRunning = args[17] as Boolean
+        // args[18] is downloadProgress
+        val mResult = args[19] as MatchResult?
+        val mRunning = args[20] as Boolean
+        val steeringShow = args[21] as Boolean
+        val steeringPrompt = args[22] as String
+        val coverSteeringPrompt = args[23] as String
 
         val statusObj = job?.let { JobStatus.fromName(it.status) } ?: JobStatus.SAVED
         val hint = when (statusObj) {
@@ -199,6 +204,7 @@ class JobDetailViewModel @Inject constructor(
             showInterviewDialog = showInterview,
             showAskAiQuestionDialog = showAskAi,
             showNotesDialog = showNotes,
+            showExternalUploadDialog = externalUploadShow,
             questions = questions,
             answers = answers,
             questionsRunning = qRunning,
@@ -291,10 +297,40 @@ class JobDetailViewModel @Inject constructor(
     fun showInterview(show: Boolean) { _showInterviewDialog.value = show }
     fun showAskAiQuestion(show: Boolean) { _showAskAiQuestionDialog.value = show }
     fun showNotes(show: Boolean) { _showNotesDialog.value = show }
+    fun showExternalUpload(show: Boolean) { _showExternalUploadDialog.value = show }
 
     fun updateNotes(text: String) {
         state.value.job?.let { job ->
             viewModelScope.launch { repository.updateJob(job.copy(notes = text)) }
+        }
+    }
+
+    fun saveExternalDocument(type: String, text: String) {
+        val job = state.value.job ?: return
+        val updated = when (type) {
+            "resume" -> job.copy(externalResumeText = text)
+            "cover" -> job.copy(externalCoverLetterText = text)
+            else -> job
+        }
+        viewModelScope.launch {
+            repository.updateJob(updated)
+            
+            // Log as training example for learning
+            if (text.isNotBlank()) {
+                trainingRepository.logExample(
+                    appName = "task",
+                    feature = "external_${type}_upload",
+                    inputPrompt = "External $type uploaded for job: ${job.title} with tags: ${job.tags}",
+                    modelOutput = text
+                )
+            }
+        }
+    }
+
+    fun updateTags(tags: String) {
+        val job = state.value.job ?: return
+        viewModelScope.launch {
+            repository.updateJob(job.copy(tags = tags))
         }
     }
 
