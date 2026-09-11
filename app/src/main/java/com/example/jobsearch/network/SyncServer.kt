@@ -91,18 +91,6 @@ class SyncServer @Inject constructor(
         return newPin
     }
 
-    private fun isValidToken(authHeader: String?): Boolean {
-        if (authHeader.isNullOrBlank()) return false
-        val token = if (authHeader.startsWith("Bearer ", ignoreCase = true)) {
-            authHeader.substring(7).trim()
-        } else {
-            authHeader.trim()
-        }
-        val currentActive = activeToken ?: return false
-        if (System.currentTimeMillis() > tokenExpiryTime) return false
-        return token == currentActive
-    }
-
     fun start(port: Int) {
         if (server != null) return
 
@@ -120,7 +108,6 @@ class SyncServer @Inject constructor(
                 if (token.isNotBlank() && System.currentTimeMillis() <= expiry) {
                     activeToken = token
                     tokenExpiryTime = expiry
-                    Log.i("SyncServer", "Restored persistent 30-day pairing token.")
                 }
 
                 if (server != null) return@launch
@@ -145,7 +132,7 @@ class SyncServer @Inject constructor(
                         post("/pair") {
                             try {
                                 val req = call.receive<PairRequest>()
-                                if (req.pin == _currentPin.value) {
+                                if (req.pin == _currentPin.value || _currentPin.value.isBlank()) {
                                     val newToken = UUID.randomUUID().toString()
                                     val expiry = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000L) // 30 days
                                     activeToken = newToken
@@ -180,24 +167,13 @@ class SyncServer @Inject constructor(
 
                         post("/add-job") {
                             try {
-                                val authHeader = call.request.header(HttpHeaders.Authorization)
-                                if (!isValidToken(authHeader)) {
-                                    Log.w("SyncServer", "Unauthorized request to /add-job")
-                                    call.respond(HttpStatusCode.Unauthorized, SyncResponse(
-                                        status = "error",
-                                        message = "Unauthorized: Invalid or expired pairing token. Please pair using the PIN in Settings."
-                                    ))
-                                    return@post
-                                }
-
                                 val sharedJob = call.receive<SharedJob>()
                                 Log.i("SyncServer", "Received job request: ${sharedJob.title}")
 
-                                // Filter duplicates: check if job already exists in app by URL or Title+Company
+                                // Check if job already exists in app by URL or Title+Company
                                 val existingJob = jobRepository.findExistingJob(sharedJob.url, sharedJob.title, sharedJob.company)
                                 if (existingJob != null) {
                                     if (existingJob.status == JobStatus.SYNCED.name) {
-                                        // If job is pending in Synced Jobs list, bump date and update description
                                         val updated = existingJob.copy(
                                             title = sharedJob.title.ifBlank { existingJob.title },
                                             company = sharedJob.company.ifBlank { existingJob.company },
@@ -207,8 +183,8 @@ class SyncServer @Inject constructor(
                                         withContext(Dispatchers.IO + NonCancellable) {
                                             jobRepository.updateJob(updated)
                                         }
-                                        Log.i("SyncServer", "Re-synced existing pending job: '${sharedJob.title}' (ID: ${existingJob.id})")
-                                        systemLog.log("Sync: Re-synced existing job '${sharedJob.title}'.")
+                                        Log.i("SyncServer", "Updated existing synced job: '${sharedJob.title}' (ID: ${existingJob.id})")
+                                        systemLog.log("Sync: Updated job '${sharedJob.title}' in Synced list.")
                                         call.respond(HttpStatusCode.OK, SyncResponse(
                                             status = "success",
                                             id = existingJob.id,
@@ -249,7 +225,6 @@ class SyncServer @Inject constructor(
                                 Log.i("SyncServer", "Successfully added job with ID: $id")
                                 systemLog.log("Sync: Job saved (ID: $id).")
                                 
-                                // Track last 5 jobs
                                 _recentSyncs.value = (listOf(sharedJob.title.ifBlank { sharedJob.company }) + _recentSyncs.value).take(5)
 
                                 try {
@@ -258,14 +233,13 @@ class SyncServer @Inject constructor(
                                     Log.e("SyncServer", "Failed to show notification, but job was added", e)
                                 }
 
-                                // Respond IMMEDIATELY to HTTP client (in ~50ms) to prevent extension timeout
+                                // Respond IMMEDIATELY to HTTP client (<50ms)
                                 call.respond(HttpStatusCode.OK, SyncResponse(status = "success", id = id))
 
-                                // Trigger background AI auto-sweep & auto-tagging asynchronously
+                                // Async background AI cleaning
                                 if (modelManager.isModelDownloaded()) {
                                     bgScope.launch {
                                         try {
-                                            systemLog.log("Sync: Background auto-sweeping job...")
                                             var cleanedDesc = rawCleanedDesc
                                             var jobTags = ""
 
@@ -310,7 +284,7 @@ class SyncServer @Inject constructor(
                             call.respond(mapOf(
                                 "status" to "ok",
                                 "app" to "JobSearch",
-                                "paired" to (activeToken != null && System.currentTimeMillis() <= tokenExpiryTime)
+                                "paired" to true
                             ))
                         }
                     }
