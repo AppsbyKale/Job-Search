@@ -32,9 +32,6 @@ interface JobDao {
     @Query("SELECT * FROM jobs WHERE LOWER(title) = LOWER(:title) AND LOWER(company) = LOWER(:company) LIMIT 1")
     suspend fun findByTitleAndCompany(title: String, company: String): Job?
 
-    @Query("UPDATE jobs SET status = 'SAVED' WHERE status = 'SYNCED'")
-    suspend fun promoteSyncedToSaved(): Int
-
     @Query("DELETE FROM jobs WHERE id = :id")
     suspend fun deleteById(id: Long)
 }

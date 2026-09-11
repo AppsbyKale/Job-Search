@@ -207,7 +207,7 @@ class SyncServer @Inject constructor(
                             url = sharedJob.url,
                             description = cleanedDesc,
                             dateAdded = System.currentTimeMillis(),
-                            status = JobStatus.SAVED.name,
+                            status = JobStatus.SYNCED.name,
                             notes = sharedJob.notes ?: "",
                             tags = jobTags
                         )
