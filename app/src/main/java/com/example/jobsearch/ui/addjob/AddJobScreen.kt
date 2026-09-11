@@ -219,7 +219,16 @@ fun AddJobScreen(
                     value = state.description,
                     onValueChange = viewModel::onDescriptionChange,
                     label = { Text(stringResource(R.string.job_description_label)) },
-                    minLines = 1,
+                    trailingIcon = {
+                        IconButton(onClick = viewModel::smartCleanDescription) {
+                            Icon(
+                                Icons.Default.AutoAwesome,
+                                contentDescription = stringResource(R.string.smart_clean_desc),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    },
+                    minLines = 3,
                     modifier = Modifier.fillMaxWidth()
                 )
             }

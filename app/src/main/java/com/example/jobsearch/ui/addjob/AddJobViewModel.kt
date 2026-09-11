@@ -104,7 +104,16 @@ class AddJobViewModel @Inject constructor(
     }
 
     fun smartCleanDescription() {
-        autoSweep(_state.value.description)
+        val desc = _state.value.description
+        if (desc.isBlank()) {
+            _state.update { it.copy(saveError = "No job description to clean.") }
+            return
+        }
+        if (!modelManager.isModelDownloaded()) {
+            _state.update { it.copy(saveError = "AI model is not downloaded. Go to Settings to download Gemma (~2GB) first.") }
+            return
+        }
+        autoSweep(desc)
     }
 
     fun loadJob(id: Long) {
@@ -119,8 +128,12 @@ class AddJobViewModel @Inject constructor(
                         title = job.title,
                         company = job.company,
                         description = job.description,
+                        tags = job.tags,
                         parsed = true
                     )
+                }
+                if (job.description.isNotBlank()) {
+                    autoSweep(job.description)
                 }
             }
         }
