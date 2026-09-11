@@ -180,15 +180,33 @@ class SyncRepository @Inject constructor(
                         val sharedJob = call.receive<SharedJob>()
                         Log.i("SyncServer", "Received job request: ${sharedJob.title}")
 
-                        // Filter duplicates: check if job already exists in app by URL or Title+Company
+                        // Check if job already exists in app by URL or Title+Company
                         val existingJob = jobRepository.findExistingJob(sharedJob.url, sharedJob.title, sharedJob.company)
                         if (existingJob != null) {
-                            Log.i("SyncServer", "Duplicate job ignored: '${sharedJob.title}' (ID: ${existingJob.id})")
-                            systemLog.log("Sync: Ignored duplicate job '${sharedJob.title}' at '${sharedJob.company}'.")
+                            val cleanedDesc = parser.trimFluff(sharedJob.description)
+                            val updated = existingJob.copy(
+                                title = sharedJob.title.ifBlank { existingJob.title },
+                                company = sharedJob.company.ifBlank { existingJob.company },
+                                description = if (cleanedDesc.isNotBlank()) cleanedDesc else existingJob.description,
+                                notes = sharedJob.notes ?: existingJob.notes,
+                                status = JobStatus.SYNCED.name,
+                                dateAdded = System.currentTimeMillis()
+                            )
+                            withContext(Dispatchers.IO + NonCancellable) {
+                                jobRepository.updateJob(updated)
+                            }
+                            Log.i("SyncServer", "Restored/Updated job in Synced list: '${sharedJob.title}' (ID: ${existingJob.id})")
+                            systemLog.log("Sync: Restored job '${sharedJob.title}' to Synced list.")
+                            _recentSyncs.value = (listOf(sharedJob.title.ifBlank { sharedJob.company }) + _recentSyncs.value).take(5)
+                            try {
+                                showJobReceivedNotification(sharedJob.title, sharedJob.company)
+                            } catch (e: Exception) {
+                                Log.e("SyncServer", "Failed to show notification, but job was updated", e)
+                            }
                             call.respond(HttpStatusCode.OK, SyncResponse(
-                                status = "exists",
+                                status = "success",
                                 id = existingJob.id,
-                                message = "Job already exists in app"
+                                message = "Job restored to Synced list"
                             ))
                             return@post
                         }
