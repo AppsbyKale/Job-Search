@@ -53,7 +53,7 @@ class SettingsRepository(private val context: Context) {
         securePrefs.getString("secure_gemini_api_key", null) ?: it[keyGeminiApiKey] ?: ""
     }
     val useCustomApiKey: Flow<Boolean> = context.dataStore.data.map { it[keyUseCustomApiKey] ?: false }
-    val desktopSyncEnabled: Flow<Boolean> = context.dataStore.data.map { it[keyDesktopSyncEnabled] ?: false }
+    val desktopSyncEnabled: Flow<Boolean> = context.dataStore.data.map { it[keyDesktopSyncEnabled] ?: true }
     val desktopSyncPort: Flow<Int> = context.dataStore.data.map { it[keyDesktopSyncPort] ?: DEFAULT_SYNC_PORT }
     val runSyncOnStartup: Flow<Boolean> = context.dataStore.data.map { it[keyRunSyncOnStartup] ?: false }
     val trainingLoggingEnabled: Flow<Boolean> = context.dataStore.data.map { it[keyTrainingLoggingEnabled] ?: false }
