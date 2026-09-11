@@ -13,6 +13,7 @@ import com.example.jobsearch.data.JobRepository
 import com.example.jobsearch.data.JobStatus
 import com.example.jobsearch.data.PairRequest
 import com.example.jobsearch.data.PairResponse
+import com.example.jobsearch.data.SettingsRepository
 import com.example.jobsearch.data.SharedJob
 import com.example.jobsearch.data.SyncResponse
 import com.example.jobsearch.data.SystemLogRepository
@@ -36,7 +37,9 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.net.Inet4Address
@@ -53,6 +56,7 @@ class SyncServer @Inject constructor(
     private val trainingRepository: TrainingRepository,
     private val modelManager: IModelManager,
     private val parser: JobParser,
+    private val settingsRepository: SettingsRepository,
     private val systemLog: SystemLogRepository
 ) {
     private var server: ApplicationEngine? = null
@@ -64,7 +68,7 @@ class SyncServer @Inject constructor(
     private val _recentSyncs = MutableStateFlow<List<String>>(emptyList())
     val recentSyncs: StateFlow<List<String>> = _recentSyncs.asStateFlow()
 
-    private val _currentPin = MutableStateFlow(generatePin())
+    private val _currentPin = MutableStateFlow("123456")
     val currentPin: StateFlow<String> = _currentPin.asStateFlow()
 
     @Volatile
@@ -80,6 +84,11 @@ class SyncServer @Inject constructor(
     fun refreshPin(): String {
         val newPin = generatePin()
         _currentPin.value = newPin
+        activeToken = null
+        tokenExpiryTime = 0L
+        bgScope.launch {
+            settingsRepository.saveSyncPairing(newPin, "", 0L)
+        }
         return newPin
     }
 
@@ -95,8 +104,33 @@ class SyncServer @Inject constructor(
         return token == currentActive
     }
 
+    private fun restoreSavedCredentials() {
+        runCatching {
+            runBlocking(Dispatchers.IO) {
+                var pin = settingsRepository.syncPin.first()
+                if (pin.isBlank()) {
+                    pin = generatePin()
+                    settingsRepository.saveSyncPin(pin)
+                }
+                _currentPin.value = pin
+
+                val token = settingsRepository.syncToken.first()
+                val expiry = settingsRepository.syncTokenExpiry.first()
+                if (token.isNotBlank() && System.currentTimeMillis() <= expiry) {
+                    activeToken = token
+                    tokenExpiryTime = expiry
+                    Log.i("SyncServer", "Restored persistent 30-day pairing token.")
+                }
+            }
+        }.onFailure { e ->
+            Log.e("SyncServer", "Failed to restore sync credentials", e)
+        }
+    }
+
     fun start(port: Int) {
         if (server != null) return
+
+        restoreSavedCredentials()
 
         server = embeddedServer(Netty, port = port, host = "0.0.0.0") {
             install(ContentNegotiation) {
@@ -123,6 +157,10 @@ class SyncServer @Inject constructor(
                             val expiry = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000L) // 30 days
                             activeToken = newToken
                             tokenExpiryTime = expiry
+
+                            bgScope.launch {
+                                settingsRepository.saveSyncPairing(_currentPin.value, newToken, expiry)
+                            }
                             
                             Log.i("SyncServer", "Client paired successfully with PIN.")
                             systemLog.log("Sync: Desktop client paired successfully.")

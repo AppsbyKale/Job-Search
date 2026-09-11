@@ -188,6 +188,7 @@ object AppModule {
         trainingRepository: TrainingRepository,
         modelManager: IModelManager,
         jobParser: JobParser,
+        settingsRepository: SettingsRepository,
         systemLog: com.example.jobsearch.data.SystemLogRepository
     ): SyncServer {
         return SyncServer(
@@ -196,6 +197,7 @@ object AppModule {
             trainingRepository,
             modelManager,
             jobParser,
+            settingsRepository,
             systemLog
         )
     }

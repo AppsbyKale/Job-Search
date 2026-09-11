@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.security.crypto.EncryptedSharedPreferences
@@ -42,6 +43,9 @@ class SettingsRepository(private val context: Context) {
     private val keyDesktopSyncPort = intPreferencesKey("desktop_sync_port")
     private val keyRunSyncOnStartup = booleanPreferencesKey("run_sync_on_startup")
     private val keyTrainingLoggingEnabled = booleanPreferencesKey("training_logging_enabled")
+    private val keySyncPin = stringPreferencesKey("sync_pin")
+    private val keySyncToken = stringPreferencesKey("sync_token")
+    private val keySyncTokenExpiry = longPreferencesKey("sync_token_expiry")
 
     val resumeText: Flow<String> = context.dataStore.data.map { it[keyResumeText] ?: "" }
     val resumeFileName: Flow<String> = context.dataStore.data.map { it[keyResumeFileName] ?: "" }
@@ -57,6 +61,9 @@ class SettingsRepository(private val context: Context) {
     val desktopSyncPort: Flow<Int> = context.dataStore.data.map { it[keyDesktopSyncPort] ?: DEFAULT_SYNC_PORT }
     val runSyncOnStartup: Flow<Boolean> = context.dataStore.data.map { it[keyRunSyncOnStartup] ?: false }
     val trainingLoggingEnabled: Flow<Boolean> = context.dataStore.data.map { it[keyTrainingLoggingEnabled] ?: false }
+    val syncPin: Flow<String> = context.dataStore.data.map { it[keySyncPin] ?: "" }
+    val syncToken: Flow<String> = context.dataStore.data.map { it[keySyncToken] ?: "" }
+    val syncTokenExpiry: Flow<Long> = context.dataStore.data.map { it[keySyncTokenExpiry] ?: 0L }
 
     suspend fun setResumeText(text: String) {
         context.dataStore.edit { it[keyResumeText] = text }
@@ -89,6 +96,18 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setTrainingLoggingEnabled(enabled: Boolean) {
         context.dataStore.edit { it[keyTrainingLoggingEnabled] = enabled }
+    }
+
+    suspend fun saveSyncPairing(pin: String, token: String, expiryTime: Long) {
+        context.dataStore.edit {
+            it[keySyncPin] = pin
+            it[keySyncToken] = token
+            it[keySyncTokenExpiry] = expiryTime
+        }
+    }
+
+    suspend fun saveSyncPin(pin: String) {
+        context.dataStore.edit { it[keySyncPin] = pin }
     }
 
     suspend fun getGeminiApiKey(): String {
