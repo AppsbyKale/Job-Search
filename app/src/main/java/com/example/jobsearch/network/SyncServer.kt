@@ -30,11 +30,13 @@ import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.net.Inet4Address
@@ -54,6 +56,7 @@ class SyncServer @Inject constructor(
     private val systemLog: SystemLogRepository
 ) {
     private var server: ApplicationEngine? = null
+    private val bgScope = CoroutineScope(Dispatchers.IO)
 
     private val _isServerRunning = MutableStateFlow(false)
     val isServerRunning: StateFlow<Boolean> = _isServerRunning.asStateFlow()
@@ -162,64 +165,56 @@ class SyncServer @Inject constructor(
                         // Filter duplicates: check if job already exists in app by URL or Title+Company
                         val existingJob = jobRepository.findExistingJob(sharedJob.url, sharedJob.title, sharedJob.company)
                         if (existingJob != null) {
-                            Log.i("SyncServer", "Duplicate job ignored: '${sharedJob.title}' (ID: ${existingJob.id})")
-                            systemLog.log("Sync: Ignored duplicate job '${sharedJob.title}' at '${sharedJob.company}'.")
-                            call.respond(HttpStatusCode.OK, SyncResponse(
-                                status = "exists",
-                                id = existingJob.id,
-                                message = "Job already exists in app"
-                            ))
-                            return@post
+                            if (existingJob.status == JobStatus.SYNCED.name) {
+                                // If job is pending in Synced Jobs list, bump date and update description
+                                val updated = existingJob.copy(
+                                    title = sharedJob.title.ifBlank { existingJob.title },
+                                    company = sharedJob.company.ifBlank { existingJob.company },
+                                    description = parser.trimFluff(sharedJob.description),
+                                    dateAdded = System.currentTimeMillis()
+                                )
+                                withContext(Dispatchers.IO + NonCancellable) {
+                                    jobRepository.updateJob(updated)
+                                }
+                                Log.i("SyncServer", "Re-synced existing pending job: '${sharedJob.title}' (ID: ${existingJob.id})")
+                                systemLog.log("Sync: Re-synced existing job '${sharedJob.title}'.")
+                                call.respond(HttpStatusCode.OK, SyncResponse(
+                                    status = "success",
+                                    id = existingJob.id,
+                                    message = "Job updated in Synced list"
+                                ))
+                                return@post
+                            } else {
+                                Log.i("SyncServer", "Duplicate job ignored: '${sharedJob.title}' (ID: ${existingJob.id})")
+                                systemLog.log("Sync: Ignored duplicate job '${sharedJob.title}' at '${sharedJob.company}'.")
+                                call.respond(HttpStatusCode.OK, SyncResponse(
+                                    status = "exists",
+                                    id = existingJob.id,
+                                    message = "Job already exists in app"
+                                ))
+                                return@post
+                            }
                         }
 
                         systemLog.log("Sync: Received job '${sharedJob.title}' from desktop.")
-                        
-                        var cleanedDesc = parser.trimFluff(sharedJob.description)
-                        var jobTags = ""
-                        
-                        if (modelManager.isModelDownloaded()) {
-                            try {
-                                systemLog.log("Sync: Auto-sweeping and tagging job...")
-                                
-                                // 1. Clean
-                                val cleanPrompt = PromptBuilder.smartCleanPrompt(cleanedDesc)
-                                val cleaned = modelManager.generate(cleanPrompt, source = "Sync Auto-Sweep").trim()
-                                if (cleaned.isNotBlank()) {
-                                    trainingRepository.logExample("task", "auto_sweep_sync", cleanPrompt, cleaned)
-                                    cleanedDesc = cleaned
-                                }
+                        val rawCleanedDesc = parser.trimFluff(sharedJob.description)
 
-                                // 2. Tag
-                                val tagPrompt = PromptBuilder.taggingPrompt(sharedJob.title, sharedJob.description)
-                                val tags = modelManager.generate(tagPrompt, source = "Sync Auto-Tagging").trim()
-                                if (tags.isNotBlank()) {
-                                    trainingRepository.logExample("task", "auto_tagging_sync", tagPrompt, tags)
-                                    jobTags = tags
-                                }
-                            } catch (e: Exception) {
-                                Log.e("SyncServer", "AI Sweep/Tag failed", e)
-                            }
-                        }
-
-                        val job = Job(
+                        val newJob = Job(
                             title = sharedJob.title,
                             company = sharedJob.company,
                             url = sharedJob.url,
-                            description = cleanedDesc,
+                            description = rawCleanedDesc,
                             dateAdded = System.currentTimeMillis(),
                             status = JobStatus.SYNCED.name,
                             notes = sharedJob.notes ?: "",
-                            tags = jobTags
+                            tags = ""
                         )
+                        
                         Log.d("SyncServer", "Saving job to database...")
-                        val id = try {
-                            withContext(Dispatchers.IO + NonCancellable) {
-                                jobRepository.addJob(job)
-                            }
-                        } catch (e: Exception) {
-                            Log.e("SyncServer", "Failed to save job: ${e.message}")
-                            throw e
+                        val id = withContext(Dispatchers.IO + NonCancellable) {
+                            jobRepository.addJob(newJob)
                         }
+                        
                         Log.i("SyncServer", "Successfully added job with ID: $id")
                         systemLog.log("Sync: Job saved (ID: $id).")
                         
@@ -231,7 +226,45 @@ class SyncServer @Inject constructor(
                         } catch (e: Exception) {
                             Log.e("SyncServer", "Failed to show notification, but job was added", e)
                         }
+
+                        // Respond IMMEDIATELY to HTTP client (in ~50ms) to prevent extension timeout
                         call.respond(HttpStatusCode.OK, SyncResponse(status = "success", id = id))
+
+                        // Trigger background AI auto-sweep & auto-tagging asynchronously
+                        if (modelManager.isModelDownloaded()) {
+                            bgScope.launch {
+                                try {
+                                    systemLog.log("Sync: Background auto-sweeping job...")
+                                    var cleanedDesc = rawCleanedDesc
+                                    var jobTags = ""
+
+                                    val cleanPrompt = PromptBuilder.smartCleanPrompt(cleanedDesc)
+                                    val cleaned = modelManager.generate(cleanPrompt, source = "Sync Auto-Sweep").trim()
+                                    if (cleaned.isNotBlank()) {
+                                        trainingRepository.logExample("task", "auto_sweep_sync", cleanPrompt, cleaned)
+                                        cleanedDesc = cleaned
+                                    }
+
+                                    val tagPrompt = PromptBuilder.taggingPrompt(sharedJob.title, rawCleanedDesc)
+                                    val tags = modelManager.generate(tagPrompt, source = "Sync Auto-Tagging").trim()
+                                    if (tags.isNotBlank()) {
+                                        trainingRepository.logExample("task", "auto_tagging_sync", tagPrompt, tags)
+                                        jobTags = tags
+                                    }
+
+                                    jobRepository.getJob(id)?.let { savedJob ->
+                                        jobRepository.updateJob(
+                                            savedJob.copy(
+                                                description = cleanedDesc,
+                                                tags = jobTags
+                                            )
+                                        )
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e("SyncServer", "Background AI Sweep/Tag failed", e)
+                                }
+                            }
+                        }
                     } catch (e: Exception) {
                         Log.e("SyncServer", "Critical error in /add-job", e)
                         call.respond(HttpStatusCode.InternalServerError, SyncResponse(
