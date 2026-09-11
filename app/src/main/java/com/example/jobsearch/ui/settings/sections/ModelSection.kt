@@ -108,16 +108,16 @@ fun ModelSection(
                         modifier = Modifier.fillMaxWidth()
                     ) { Text(stringResource(R.string.download_model_button)) }
                 }
-
-                Spacer(Modifier.height(8.dp))
-
-                OutlinedButton(
-                    onClick = onSelectFile,
-                    enabled = !state.busy,
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("Select Local Model File (.litertlm)") }
             }
         }
+
+        Spacer(Modifier.height(12.dp))
+
+        OutlinedButton(
+            onClick = onSelectFile,
+            enabled = !state.busy,
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Select Local Model File (.litertlm)") }
 
         Spacer(Modifier.height(16.dp))
 
