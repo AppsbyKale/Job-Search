@@ -40,4 +40,13 @@ interface InterviewDao {
 
     @Query("DELETE FROM interview_reports WHERE jobId = :jobId")
     suspend fun deleteReport(jobId: Long)
+
+    @Query("DELETE FROM interview_questions")
+    suspend fun deleteAllQuestions()
+
+    @Query("DELETE FROM interview_answers")
+    suspend fun deleteAllAnswers()
+
+    @Query("DELETE FROM interview_reports")
+    suspend fun deleteAllReports()
 }

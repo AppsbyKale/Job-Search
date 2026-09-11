@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.jobsearch.ai.IModelManager
 import com.example.jobsearch.ai.ModelManager
 import com.example.jobsearch.data.BackupRepository
+import com.example.jobsearch.data.InterviewRepository
 import com.example.jobsearch.data.JobRepository
 import com.example.jobsearch.data.SettingsRepository
 import com.example.jobsearch.data.TrainingRepository
@@ -36,6 +37,7 @@ class SettingsViewModel @Inject constructor(
     private val resumeImporter: ResumeImporter,
     private val exporter: DocumentExporter,
     private val jobRepository: JobRepository,
+    private val interviewRepository: InterviewRepository,
     private val syncRepository: com.example.jobsearch.data.SyncRepository,
     private val backupRepository: BackupRepository,
     private val trainingRepository: TrainingRepository,
@@ -358,6 +360,24 @@ class SettingsViewModel @Inject constructor(
                 android.util.Log.e("SettingsViewModel", "Restore failed", e)
                 _state.update { it.copy(busy = false, error = "Import failed: ${e.message}") }
                 systemLogRepository.log("ERROR: Restore failed: ${e.message}")
+            }
+        }
+    }
+
+    fun clearAllDatabaseJobs() {
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, error = null, message = null) }
+            try {
+                interviewRepository.deleteAllInterviewData()
+                jobRepository.deleteAllJobs()
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        message = "Database cleared! All jobs wiped out. You can now perform a fresh sync from your Chrome addon."
+                    )
+                }
+            } catch (e: Exception) {
+                _state.update { it.copy(busy = false, error = "Failed to clear database: ${e.message}") }
             }
         }
     }

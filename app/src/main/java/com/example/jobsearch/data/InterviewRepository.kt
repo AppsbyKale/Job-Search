@@ -31,4 +31,10 @@ class InterviewRepository(private val dao: InterviewDao) {
         dao.deleteAnswers(jobId)
         dao.deleteReport(jobId)
     }
+
+    suspend fun deleteAllInterviewData() {
+        dao.deleteAllQuestions()
+        dao.deleteAllAnswers()
+        dao.deleteAllReports()
+    }
 }

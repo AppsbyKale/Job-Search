@@ -10,6 +10,7 @@ class JobRepository(private val dao: JobDao) {
     suspend fun addJob(job: Job): Long = dao.insert(job)
     suspend fun updateJob(job: Job) = dao.update(job)
     suspend fun deleteJob(id: Long) = dao.deleteById(id)
+    suspend fun deleteAllJobs() = dao.deleteAll()
 
     suspend fun findExistingJob(url: String, title: String, company: String): Job? {
         val trimmedUrl = url.trim()

@@ -33,7 +33,9 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -378,7 +380,8 @@ fun SettingsScreen(
                         onBackup = { backupLauncher.launch("jobsearch_backup.jsbackup") },
                         onRestore = {
                             restoreLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
-                        }
+                        },
+                        onClearDatabase = viewModel::clearAllDatabaseJobs
                     )
 
                     ExportSection(
@@ -441,8 +444,11 @@ private fun CloudAiSection(
 private fun DataPrivacySection(
     state: SettingsViewModel.UiState,
     onBackup: () -> Unit,
-    onRestore: () -> Unit
+    onRestore: () -> Unit,
+    onClearDatabase: () -> Unit
 ) {
+    var showClearConfirm by remember { mutableStateOf(false) }
+
     AppCard(modifier = Modifier.fillMaxWidth()) {
         SectionHeader(stringResource(R.string.data_privacy_section_title))
         Text(
@@ -467,6 +473,36 @@ private fun DataPrivacySection(
                 modifier = Modifier.weight(1f)
             ) { Text(stringResource(R.string.restore_data_button)) }
         }
+
+        Spacer(Modifier.height(12.dp))
+        OutlinedButton(
+            onClick = { showClearConfirm = true },
+            enabled = !state.busy,
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Clear Database Jobs")
+        }
+    }
+
+    if (showClearConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirm = false },
+            title = { Text("Clear All Jobs?") },
+            text = { Text("This will permanently delete all jobs in the app database so you can re-sync from your Chrome addon. Continue?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showClearConfirm = false
+                        onClearDatabase()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete All") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearConfirm = false }) { Text("Cancel") }
+            }
+        )
     }
 }
 

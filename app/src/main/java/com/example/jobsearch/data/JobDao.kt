@@ -34,4 +34,7 @@ interface JobDao {
 
     @Query("DELETE FROM jobs WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    @Query("DELETE FROM jobs")
+    suspend fun deleteAll()
 }
