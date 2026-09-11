@@ -335,17 +335,20 @@ class SyncServer @Inject constructor(
 
     fun getLocalIpAddress(): String? {
         try {
-            val interfaces = NetworkInterface.getNetworkInterfaces()
-            while (interfaces.hasMoreElements()) {
-                val networkInterface = interfaces.nextElement()
-                val addresses = networkInterface.inetAddresses
-                while (addresses.hasMoreElements()) {
-                    val address = addresses.nextElement()
-                    if (!address.isLoopbackAddress && address is Inet4Address) {
-                        return address.hostAddress
-                    }
-                }
-            }
+            val interfaces = NetworkInterface.getNetworkInterfaces()?.toList() ?: return null
+            
+            val wlanIp = interfaces
+                .filter { it.name.contains("wlan", ignoreCase = true) || it.name.contains("eth", ignoreCase = true) }
+                .flatMap { it.inetAddresses.toList() }
+                .firstOrNull { !it.isLoopbackAddress && it is Inet4Address }
+                ?.hostAddress
+
+            if (!wlanIp.isNullOrBlank()) return wlanIp
+
+            return interfaces
+                .flatMap { it.inetAddresses.toList() }
+                .firstOrNull { !it.isLoopbackAddress && it is Inet4Address }
+                ?.hostAddress
         } catch (e: Exception) {
             Log.e("SyncServer", "Failed to get IP address", e)
         }

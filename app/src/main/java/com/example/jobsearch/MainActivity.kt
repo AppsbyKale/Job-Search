@@ -16,6 +16,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.jobsearch.data.SyncService
 import com.example.jobsearch.ui.addjob.AddJobScreen
 import com.example.jobsearch.ui.documented.DocumentViewScreen
 import com.example.jobsearch.ui.jobdetail.JobDetailScreen
@@ -36,6 +37,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        SyncService.start(this)
         handleIntent(intent)
         enableEdgeToEdge()
         setContent {
