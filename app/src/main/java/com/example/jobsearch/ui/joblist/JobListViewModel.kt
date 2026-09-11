@@ -44,6 +44,12 @@ class JobListViewModel @Inject constructor(
     val syncedJobs: StateFlow<List<Job>> = repository.observeByStatus(JobStatus.SYNCED.name)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    init {
+        viewModelScope.launch {
+            repository.promoteSyncedJobsToSaved()
+        }
+    }
+
     val jobs: StateFlow<List<JobUiModel>> = combine(
         _filter.flatMapLatest { status ->
             if (status == null) repository.observeJobs()
@@ -52,10 +58,9 @@ class JobListViewModel @Inject constructor(
         _searchQuery
     ) { list, query ->
         list.filter { job ->
-            job.status != JobStatus.SYNCED.name &&
-            (query.isBlank() || 
+            query.isBlank() || 
             job.title.contains(query, ignoreCase = true) || 
-            job.company.contains(query, ignoreCase = true))
+            job.company.contains(query, ignoreCase = true)
         }.map { job ->
             JobUiModel(
                 job = job,
