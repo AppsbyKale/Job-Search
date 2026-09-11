@@ -257,20 +257,23 @@ fun JobDetailScreen(
                 )
 
                 if (job.tags.isNotBlank()) {
-                    Row(
+                    OptIn(ExperimentalLayoutApi::class)
+                    FlowRow(
                         modifier = Modifier.fillMaxWidth().clickable { showTagEditor = true },
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        maxLines = 2
                     ) {
                         job.tagList.forEach { tag ->
                             Surface(
-                                shape = RoundedCornerShape(16.dp),
+                                shape = RoundedCornerShape(12.dp),
                                 color = MaterialTheme.colorScheme.secondaryContainer,
-                                modifier = Modifier.padding(vertical = 4.dp)
+                                modifier = Modifier.height(28.dp)
                             ) {
                                 Text(
                                     text = tag,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                                    style = MaterialTheme.typography.labelMedium,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
                             }
@@ -278,7 +281,7 @@ fun JobDetailScreen(
                     }
                 } else {
                     TextButton(onClick = { showTagEditor = true }) {
-                        Text("+ Add Tags", style = MaterialTheme.typography.labelMedium)
+                        Text("+ Add Tags", style = MaterialTheme.typography.labelSmall)
                     }
                 }
                 

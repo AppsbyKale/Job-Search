@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -235,14 +236,18 @@ fun AddJobScreen(
 
             if (state.tags.isNotBlank()) {
                 item {
-                    Row(
+                    OptIn(ExperimentalLayoutApi::class)
+                    FlowRow(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        maxLines = 2
                     ) {
                         state.tags.split(",").map { it.trim() }.filter { it.isNotBlank() }.forEach { tag ->
-                            SuggestionChip(
+                            AssistChip(
                                 onClick = { },
-                                label = { Text(tag) }
+                                label = { Text(tag, style = MaterialTheme.typography.labelSmall) },
+                                modifier = Modifier.height(28.dp)
                             )
                         }
                     }

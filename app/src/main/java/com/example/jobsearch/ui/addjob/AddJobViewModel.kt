@@ -297,6 +297,7 @@ class AddJobViewModel @Inject constructor(
                             url = s.url.trim(),
                             description = s.description.trim(),
                             resumeText = s.improvedResume.trim(),
+                            tags = s.tags.trim(),
                             status = com.example.jobsearch.data.JobStatus.SAVED.name
                         )
                         jobs.updateJob(updated)
@@ -312,6 +313,7 @@ class AddJobViewModel @Inject constructor(
                     url = s.url.trim(),
                     description = s.description.trim(),
                     resumeText = s.improvedResume.trim(),
+                    tags = s.tags.trim(),
                     dateAdded = System.currentTimeMillis()
                 )
                 val id = jobs.addJob(job)
