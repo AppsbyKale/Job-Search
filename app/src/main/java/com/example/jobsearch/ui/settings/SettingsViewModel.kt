@@ -16,6 +16,7 @@ import com.example.jobsearch.document.DocumentExporter
 import com.example.jobsearch.resume.ResumeImporter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +24,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.util.Locale
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -252,11 +256,47 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun importCustomModel(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, error = null, message = null) }
+            try {
+                val file = withContext(Dispatchers.IO) {
+                    val aiFolder = File(context.filesDir, "AI_Models")
+                    if (!aiFolder.exists()) aiFolder.mkdirs()
+                    val destFile = File(aiFolder, "Gemma-4-E2B-it.litertlm")
+                    
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        destFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                    destFile
+                }
+                if (file.exists() && file.length() > 100_000_000L) {
+                    settingsRepository.setCustomModelPath(file.absolutePath)
+                    _state.update {
+                        it.copy(
+                            busy = false,
+                            modelDownloaded = true,
+                            modelFileSize = file.length(),
+                            message = "Model file selected and ready! (${formatBytes(file.length())})"
+                        )
+                    }
+                } else {
+                    _state.update { it.copy(busy = false, error = "Invalid model file selected.") }
+                }
+            } catch (e: Exception) {
+                _state.update { it.copy(busy = false, error = "Failed to select model file: ${e.message}") }
+            }
+        }
+    }
+
     fun deleteModel() {
         viewModelScope.launch {
             android.util.Log.d("SettingsViewModel", "Deleting model...")
             _state.update { it.copy(busy = true, error = null, message = null) }
             modelManager.deleteModel()
+            settingsRepository.setCustomModelPath("")
             _state.update {
                 it.copy(
                     busy = false,
@@ -388,5 +428,17 @@ class SettingsViewModel @Inject constructor(
 
     fun dismissMessage() {
         _state.update { it.copy(message = null, error = null) }
+    }
+
+    private fun formatBytes(bytes: Long): String {
+        if (bytes <= 0) return "0 B"
+        val kb = bytes / 1024.0
+        val mb = kb / 1024.0
+        val gb = mb / 1024.0
+        return when {
+            gb >= 1 -> String.format(Locale.US, "%.2f GB", gb)
+            mb >= 1 -> String.format(Locale.US, "%.1f MB", mb)
+            else -> String.format(Locale.US, "%.0f KB", kb)
+        }
     }
 }

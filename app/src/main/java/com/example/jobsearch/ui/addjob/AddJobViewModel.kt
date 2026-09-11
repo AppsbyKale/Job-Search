@@ -10,6 +10,7 @@ import com.example.jobsearch.data.InterviewQuestion
 import com.example.jobsearch.data.InterviewRepository
 import com.example.jobsearch.data.Job
 import com.example.jobsearch.data.JobRepository
+import com.example.jobsearch.data.JobStatus
 import com.example.jobsearch.data.SettingsRepository
 import com.example.jobsearch.parsing.JobParser
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -132,7 +133,7 @@ class AddJobViewModel @Inject constructor(
                         parsed = true
                     )
                 }
-                if (job.description.isNotBlank()) {
+                if (job.status == JobStatus.SYNCED.name && job.description.isNotBlank()) {
                     autoSweep(job.description)
                 }
             }

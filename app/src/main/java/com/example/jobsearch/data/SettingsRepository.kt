@@ -14,6 +14,7 @@ import com.example.jobsearch.BuildConfig
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
 import java.io.File
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
@@ -132,8 +133,22 @@ class SettingsRepository(private val context: Context) {
         return url.contains("google/") || url.contains("gemma-3") || url.contains("E4B")
     }
 
+    private val keyCustomModelPath = stringPreferencesKey("custom_model_path")
+    val customModelPath: Flow<String> = context.dataStore.data.map { it[keyCustomModelPath] ?: "" }
+
+    suspend fun setCustomModelPath(path: String) {
+        context.dataStore.edit { it[keyCustomModelPath] = path }
+    }
+
     val modelFile: File
         get() {
+            val custom = runBlocking { customModelPath.first() }
+            if (custom.isNotBlank()) {
+                val f = File(custom)
+                if (f.exists() && f.length() > 100_000_000L) {
+                    return f
+                }
+            }
             val aiFolder = File(context.filesDir, "AI_Models")
             if (!aiFolder.exists()) aiFolder.mkdirs()
             return File(aiFolder, "Gemma-4-E2B-it.litertlm")

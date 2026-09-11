@@ -165,6 +165,12 @@ fun SettingsScreen(
         uri?.let { viewModel.exportTrainingData(it) }
     }
 
+    val modelFileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let { viewModel.importCustomModel(context, it) }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -249,6 +255,7 @@ fun SettingsScreen(
                         onUrlChange = viewModel::onModelUrlChange,
                         onSaveUrl = viewModel::saveModelUrl,
                         onDownload = viewModel::downloadModel,
+                        onSelectFile = { modelFileLauncher.launch(arrayOf("*/*")) },
                         onDelete = viewModel::deleteModel
                     )
 
