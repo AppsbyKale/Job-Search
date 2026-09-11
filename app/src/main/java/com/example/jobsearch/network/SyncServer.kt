@@ -24,6 +24,7 @@ import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
+import io.ktor.server.cio.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.contentnegotiation.*
@@ -132,7 +133,8 @@ class SyncServer @Inject constructor(
 
         restoreSavedCredentials()
 
-        server = embeddedServer(Netty, port = port, host = "0.0.0.0") {
+        try {
+            server = embeddedServer(CIO, port = port, host = "0.0.0.0") {
             install(ContentNegotiation) {
                 json(Json {
                     ignoreUnknownKeys = true
@@ -323,8 +325,15 @@ class SyncServer @Inject constructor(
             }
         }.start(wait = false)
         _isServerRunning.value = true
-        Log.i("SyncServer", "Server started on port $port with PIN: ${_currentPin.value}")
+        val ip = getLocalIpAddress() ?: "0.0.0.0"
+        Log.i("SyncServer", "Server started on $ip:$port with PIN: ${_currentPin.value}")
+        systemLog.log("Sync Server listening on $ip:$port (PIN: ${_currentPin.value})")
+    } catch (e: Exception) {
+        Log.e("SyncServer", "Failed to start Ktor CIO server on port $port", e)
+        systemLog.log("ERROR: Sync Server failed to start on port $port: ${e.message}")
+        _isServerRunning.value = false
     }
+}
 
     fun stop() {
         server?.stop(1000L, 2000L, TimeUnit.MILLISECONDS)
