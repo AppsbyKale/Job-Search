@@ -26,7 +26,6 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
-import io.ktor.server.netty.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.request.*
@@ -40,7 +39,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.net.Inet4Address
@@ -105,9 +103,11 @@ class SyncServer @Inject constructor(
         return token == currentActive
     }
 
-    private fun restoreSavedCredentials() {
-        runCatching {
-            runBlocking(Dispatchers.IO) {
+    fun start(port: Int) {
+        if (server != null) return
+
+        bgScope.launch {
+            try {
                 var pin = settingsRepository.syncPin.first()
                 if (pin.isBlank()) {
                     pin = generatePin()
@@ -122,218 +122,212 @@ class SyncServer @Inject constructor(
                     tokenExpiryTime = expiry
                     Log.i("SyncServer", "Restored persistent 30-day pairing token.")
                 }
+
+                if (server != null) return@launch
+
+                val embedded = embeddedServer(CIO, port = port, host = "0.0.0.0") {
+                    install(ContentNegotiation) {
+                        json(Json {
+                            ignoreUnknownKeys = true
+                            isLenient = true
+                            encodeDefaults = true
+                        })
+                    }
+                    install(CORS) {
+                        anyHost()
+                        allowMethod(HttpMethod.Options)
+                        allowMethod(HttpMethod.Post)
+                        allowMethod(HttpMethod.Get)
+                        allowHeader(HttpHeaders.ContentType)
+                        allowHeader(HttpHeaders.Authorization)
+                    }
+                    routing {
+                        post("/pair") {
+                            try {
+                                val req = call.receive<PairRequest>()
+                                if (req.pin == _currentPin.value) {
+                                    val newToken = UUID.randomUUID().toString()
+                                    val expiry = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000L) // 30 days
+                                    activeToken = newToken
+                                    tokenExpiryTime = expiry
+
+                                    bgScope.launch {
+                                        settingsRepository.saveSyncPairing(_currentPin.value, newToken, expiry)
+                                    }
+                                    
+                                    Log.i("SyncServer", "Client paired successfully with PIN.")
+                                    systemLog.log("Sync: Desktop client paired successfully.")
+                                    call.respond(HttpStatusCode.OK, PairResponse(
+                                        status = "ok",
+                                        token = newToken,
+                                        expiresInDays = 30
+                                    ))
+                                } else {
+                                    Log.w("SyncServer", "Pairing failed: Invalid PIN '${req.pin}'")
+                                    call.respond(HttpStatusCode.Unauthorized, PairResponse(
+                                        status = "error",
+                                        message = "Invalid pairing PIN. Check the PIN displayed in JobSearch Settings."
+                                    ))
+                                }
+                            } catch (e: Exception) {
+                                Log.e("SyncServer", "Error in /pair", e)
+                                call.respond(HttpStatusCode.BadRequest, PairResponse(
+                                    status = "error",
+                                    message = e.message ?: "Invalid pairing payload"
+                                ))
+                            }
+                        }
+
+                        post("/add-job") {
+                            try {
+                                val authHeader = call.request.header(HttpHeaders.Authorization)
+                                if (!isValidToken(authHeader)) {
+                                    Log.w("SyncServer", "Unauthorized request to /add-job")
+                                    call.respond(HttpStatusCode.Unauthorized, SyncResponse(
+                                        status = "error",
+                                        message = "Unauthorized: Invalid or expired pairing token. Please pair using the PIN in Settings."
+                                    ))
+                                    return@post
+                                }
+
+                                val sharedJob = call.receive<SharedJob>()
+                                Log.i("SyncServer", "Received job request: ${sharedJob.title}")
+
+                                // Filter duplicates: check if job already exists in app by URL or Title+Company
+                                val existingJob = jobRepository.findExistingJob(sharedJob.url, sharedJob.title, sharedJob.company)
+                                if (existingJob != null) {
+                                    if (existingJob.status == JobStatus.SYNCED.name) {
+                                        // If job is pending in Synced Jobs list, bump date and update description
+                                        val updated = existingJob.copy(
+                                            title = sharedJob.title.ifBlank { existingJob.title },
+                                            company = sharedJob.company.ifBlank { existingJob.company },
+                                            description = parser.trimFluff(sharedJob.description),
+                                            dateAdded = System.currentTimeMillis()
+                                        )
+                                        withContext(Dispatchers.IO + NonCancellable) {
+                                            jobRepository.updateJob(updated)
+                                        }
+                                        Log.i("SyncServer", "Re-synced existing pending job: '${sharedJob.title}' (ID: ${existingJob.id})")
+                                        systemLog.log("Sync: Re-synced existing job '${sharedJob.title}'.")
+                                        call.respond(HttpStatusCode.OK, SyncResponse(
+                                            status = "success",
+                                            id = existingJob.id,
+                                            message = "Job updated in Synced list"
+                                        ))
+                                        return@post
+                                    } else {
+                                        Log.i("SyncServer", "Duplicate job ignored: '${sharedJob.title}' (ID: ${existingJob.id})")
+                                        systemLog.log("Sync: Ignored duplicate job '${sharedJob.title}' at '${sharedJob.company}'.")
+                                        call.respond(HttpStatusCode.OK, SyncResponse(
+                                            status = "exists",
+                                            id = existingJob.id,
+                                            message = "Job already exists in app"
+                                        ))
+                                        return@post
+                                    }
+                                }
+
+                                systemLog.log("Sync: Received job '${sharedJob.title}' from desktop.")
+                                val rawCleanedDesc = parser.trimFluff(sharedJob.description)
+
+                                val newJob = Job(
+                                    title = sharedJob.title,
+                                    company = sharedJob.company,
+                                    url = sharedJob.url,
+                                    description = rawCleanedDesc,
+                                    dateAdded = System.currentTimeMillis(),
+                                    status = JobStatus.SYNCED.name,
+                                    notes = sharedJob.notes ?: "",
+                                    tags = ""
+                                )
+                                
+                                Log.d("SyncServer", "Saving job to database...")
+                                val id = withContext(Dispatchers.IO + NonCancellable) {
+                                    jobRepository.addJob(newJob)
+                                }
+                                
+                                Log.i("SyncServer", "Successfully added job with ID: $id")
+                                systemLog.log("Sync: Job saved (ID: $id).")
+                                
+                                // Track last 5 jobs
+                                _recentSyncs.value = (listOf(sharedJob.title.ifBlank { sharedJob.company }) + _recentSyncs.value).take(5)
+
+                                try {
+                                    showJobReceivedNotification(sharedJob.title, sharedJob.company)
+                                } catch (e: Exception) {
+                                    Log.e("SyncServer", "Failed to show notification, but job was added", e)
+                                }
+
+                                // Respond IMMEDIATELY to HTTP client (in ~50ms) to prevent extension timeout
+                                call.respond(HttpStatusCode.OK, SyncResponse(status = "success", id = id))
+
+                                // Trigger background AI auto-sweep & auto-tagging asynchronously
+                                if (modelManager.isModelDownloaded()) {
+                                    bgScope.launch {
+                                        try {
+                                            systemLog.log("Sync: Background auto-sweeping job...")
+                                            var cleanedDesc = rawCleanedDesc
+                                            var jobTags = ""
+
+                                            val cleanPrompt = PromptBuilder.smartCleanPrompt(cleanedDesc)
+                                            val cleaned = modelManager.generate(cleanPrompt, source = "Sync Auto-Sweep").trim()
+                                            if (cleaned.isNotBlank()) {
+                                                trainingRepository.logExample("task", "auto_sweep_sync", cleanPrompt, cleaned)
+                                                cleanedDesc = cleaned
+                                            }
+
+                                            val tagPrompt = PromptBuilder.taggingPrompt(sharedJob.title, rawCleanedDesc)
+                                            val tags = modelManager.generate(tagPrompt, source = "Sync Auto-Tagging").trim()
+                                            if (tags.isNotBlank()) {
+                                                trainingRepository.logExample("task", "auto_tagging_sync", tagPrompt, tags)
+                                                jobTags = tags
+                                            }
+
+                                            jobRepository.getJob(id)?.let { savedJob ->
+                                                jobRepository.updateJob(
+                                                    savedJob.copy(
+                                                        description = cleanedDesc,
+                                                        tags = jobTags
+                                                    )
+                                                )
+                                            }
+                                        } catch (e: Exception) {
+                                            Log.e("SyncServer", "Background AI Sweep/Tag failed", e)
+                                        }
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                Log.e("SyncServer", "Critical error in /add-job", e)
+                                call.respond(HttpStatusCode.InternalServerError, SyncResponse(
+                                    status = "error", 
+                                    message = e.message ?: "Unknown error",
+                                    type = e.javaClass.simpleName
+                                ))
+                            }
+                        }
+                        get("/status") {
+                            Log.i("SyncServer", "Status check received")
+                            call.respond(mapOf(
+                                "status" to "ok",
+                                "app" to "JobSearch",
+                                "paired" to (activeToken != null && System.currentTimeMillis() <= tokenExpiryTime)
+                            ))
+                        }
+                    }
+                }
+                server = embedded
+                embedded.start(wait = false)
+                _isServerRunning.value = true
+                val ip = getLocalIpAddress() ?: "0.0.0.0"
+                Log.i("SyncServer", "Server started on $ip:$port with PIN: ${_currentPin.value}")
+                systemLog.log("Sync Server listening on $ip:$port (PIN: ${_currentPin.value})")
+            } catch (e: Exception) {
+                Log.e("SyncServer", "Failed to start Ktor CIO server on port $port", e)
+                systemLog.log("ERROR: Sync Server failed to start on port $port: ${e.message}")
+                _isServerRunning.value = false
             }
-        }.onFailure { e ->
-            Log.e("SyncServer", "Failed to restore sync credentials", e)
         }
     }
-
-    fun start(port: Int) {
-        if (server != null) return
-
-        restoreSavedCredentials()
-
-        try {
-            server = embeddedServer(CIO, port = port, host = "0.0.0.0") {
-            install(ContentNegotiation) {
-                json(Json {
-                    ignoreUnknownKeys = true
-                    isLenient = true
-                    encodeDefaults = true
-                })
-            }
-            install(CORS) {
-                anyHost()
-                allowMethod(HttpMethod.Options)
-                allowMethod(HttpMethod.Post)
-                allowMethod(HttpMethod.Get)
-                allowHeader(HttpHeaders.ContentType)
-                allowHeader(HttpHeaders.Authorization)
-            }
-            routing {
-                post("/pair") {
-                    try {
-                        val req = call.receive<PairRequest>()
-                        if (req.pin == _currentPin.value) {
-                            val newToken = UUID.randomUUID().toString()
-                            val expiry = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000L) // 30 days
-                            activeToken = newToken
-                            tokenExpiryTime = expiry
-
-                            bgScope.launch {
-                                settingsRepository.saveSyncPairing(_currentPin.value, newToken, expiry)
-                            }
-                            
-                            Log.i("SyncServer", "Client paired successfully with PIN.")
-                            systemLog.log("Sync: Desktop client paired successfully.")
-                            call.respond(HttpStatusCode.OK, PairResponse(
-                                status = "ok",
-                                token = newToken,
-                                expiresInDays = 30
-                            ))
-                        } else {
-                            Log.w("SyncServer", "Pairing failed: Invalid PIN '${req.pin}'")
-                            call.respond(HttpStatusCode.Unauthorized, PairResponse(
-                                status = "error",
-                                message = "Invalid pairing PIN. Check the PIN displayed in JobSearch Settings."
-                            ))
-                        }
-                    } catch (e: Exception) {
-                        Log.e("SyncServer", "Error in /pair", e)
-                        call.respond(HttpStatusCode.BadRequest, PairResponse(
-                            status = "error",
-                            message = e.message ?: "Invalid pairing payload"
-                        ))
-                    }
-                }
-
-                post("/add-job") {
-                    try {
-                        val authHeader = call.request.header(HttpHeaders.Authorization)
-                        if (!isValidToken(authHeader)) {
-                            Log.w("SyncServer", "Unauthorized request to /add-job")
-                            call.respond(HttpStatusCode.Unauthorized, SyncResponse(
-                                status = "error",
-                                message = "Unauthorized: Invalid or expired pairing token. Please pair using the PIN in Settings."
-                            ))
-                            return@post
-                        }
-
-                        val sharedJob = call.receive<SharedJob>()
-                        Log.i("SyncServer", "Received job request: ${sharedJob.title}")
-
-                        // Filter duplicates: check if job already exists in app by URL or Title+Company
-                        val existingJob = jobRepository.findExistingJob(sharedJob.url, sharedJob.title, sharedJob.company)
-                        if (existingJob != null) {
-                            if (existingJob.status == JobStatus.SYNCED.name) {
-                                // If job is pending in Synced Jobs list, bump date and update description
-                                val updated = existingJob.copy(
-                                    title = sharedJob.title.ifBlank { existingJob.title },
-                                    company = sharedJob.company.ifBlank { existingJob.company },
-                                    description = parser.trimFluff(sharedJob.description),
-                                    dateAdded = System.currentTimeMillis()
-                                )
-                                withContext(Dispatchers.IO + NonCancellable) {
-                                    jobRepository.updateJob(updated)
-                                }
-                                Log.i("SyncServer", "Re-synced existing pending job: '${sharedJob.title}' (ID: ${existingJob.id})")
-                                systemLog.log("Sync: Re-synced existing job '${sharedJob.title}'.")
-                                call.respond(HttpStatusCode.OK, SyncResponse(
-                                    status = "success",
-                                    id = existingJob.id,
-                                    message = "Job updated in Synced list"
-                                ))
-                                return@post
-                            } else {
-                                Log.i("SyncServer", "Duplicate job ignored: '${sharedJob.title}' (ID: ${existingJob.id})")
-                                systemLog.log("Sync: Ignored duplicate job '${sharedJob.title}' at '${sharedJob.company}'.")
-                                call.respond(HttpStatusCode.OK, SyncResponse(
-                                    status = "exists",
-                                    id = existingJob.id,
-                                    message = "Job already exists in app"
-                                ))
-                                return@post
-                            }
-                        }
-
-                        systemLog.log("Sync: Received job '${sharedJob.title}' from desktop.")
-                        val rawCleanedDesc = parser.trimFluff(sharedJob.description)
-
-                        val newJob = Job(
-                            title = sharedJob.title,
-                            company = sharedJob.company,
-                            url = sharedJob.url,
-                            description = rawCleanedDesc,
-                            dateAdded = System.currentTimeMillis(),
-                            status = JobStatus.SYNCED.name,
-                            notes = sharedJob.notes ?: "",
-                            tags = ""
-                        )
-                        
-                        Log.d("SyncServer", "Saving job to database...")
-                        val id = withContext(Dispatchers.IO + NonCancellable) {
-                            jobRepository.addJob(newJob)
-                        }
-                        
-                        Log.i("SyncServer", "Successfully added job with ID: $id")
-                        systemLog.log("Sync: Job saved (ID: $id).")
-                        
-                        // Track last 5 jobs
-                        _recentSyncs.value = (listOf(sharedJob.title.ifBlank { sharedJob.company }) + _recentSyncs.value).take(5)
-
-                        try {
-                            showJobReceivedNotification(sharedJob.title, sharedJob.company)
-                        } catch (e: Exception) {
-                            Log.e("SyncServer", "Failed to show notification, but job was added", e)
-                        }
-
-                        // Respond IMMEDIATELY to HTTP client (in ~50ms) to prevent extension timeout
-                        call.respond(HttpStatusCode.OK, SyncResponse(status = "success", id = id))
-
-                        // Trigger background AI auto-sweep & auto-tagging asynchronously
-                        if (modelManager.isModelDownloaded()) {
-                            bgScope.launch {
-                                try {
-                                    systemLog.log("Sync: Background auto-sweeping job...")
-                                    var cleanedDesc = rawCleanedDesc
-                                    var jobTags = ""
-
-                                    val cleanPrompt = PromptBuilder.smartCleanPrompt(cleanedDesc)
-                                    val cleaned = modelManager.generate(cleanPrompt, source = "Sync Auto-Sweep").trim()
-                                    if (cleaned.isNotBlank()) {
-                                        trainingRepository.logExample("task", "auto_sweep_sync", cleanPrompt, cleaned)
-                                        cleanedDesc = cleaned
-                                    }
-
-                                    val tagPrompt = PromptBuilder.taggingPrompt(sharedJob.title, rawCleanedDesc)
-                                    val tags = modelManager.generate(tagPrompt, source = "Sync Auto-Tagging").trim()
-                                    if (tags.isNotBlank()) {
-                                        trainingRepository.logExample("task", "auto_tagging_sync", tagPrompt, tags)
-                                        jobTags = tags
-                                    }
-
-                                    jobRepository.getJob(id)?.let { savedJob ->
-                                        jobRepository.updateJob(
-                                            savedJob.copy(
-                                                description = cleanedDesc,
-                                                tags = jobTags
-                                            )
-                                        )
-                                    }
-                                } catch (e: Exception) {
-                                    Log.e("SyncServer", "Background AI Sweep/Tag failed", e)
-                                }
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.e("SyncServer", "Critical error in /add-job", e)
-                        call.respond(HttpStatusCode.InternalServerError, SyncResponse(
-                            status = "error", 
-                            message = e.message ?: "Unknown error",
-                            type = e.javaClass.simpleName
-                        ))
-                    }
-                }
-                get("/status") {
-                    Log.i("SyncServer", "Status check received")
-                    call.respond(mapOf(
-                        "status" to "ok",
-                        "app" to "JobSearch",
-                        "paired" to (activeToken != null && System.currentTimeMillis() <= tokenExpiryTime)
-                    ))
-                }
-            }
-        }.start(wait = false)
-        _isServerRunning.value = true
-        val ip = getLocalIpAddress() ?: "0.0.0.0"
-        Log.i("SyncServer", "Server started on $ip:$port with PIN: ${_currentPin.value}")
-        systemLog.log("Sync Server listening on $ip:$port (PIN: ${_currentPin.value})")
-    } catch (e: Exception) {
-        Log.e("SyncServer", "Failed to start Ktor CIO server on port $port", e)
-        systemLog.log("ERROR: Sync Server failed to start on port $port: ${e.message}")
-        _isServerRunning.value = false
-    }
-}
 
     fun stop() {
         server?.stop(1000L, 2000L, TimeUnit.MILLISECONDS)
@@ -346,6 +340,7 @@ class SyncServer @Inject constructor(
         try {
             val interfaces = NetworkInterface.getNetworkInterfaces()?.toList() ?: return null
             
+            // Priority 1: Active Wi-Fi or Ethernet interface (wlan0, wlan1, eth0)
             val wlanIp = interfaces
                 .filter { it.name.contains("wlan", ignoreCase = true) || it.name.contains("eth", ignoreCase = true) }
                 .flatMap { it.inetAddresses.toList() }
@@ -354,6 +349,7 @@ class SyncServer @Inject constructor(
 
             if (!wlanIp.isNullOrBlank()) return wlanIp
 
+            // Priority 2: Fallback to any IPv4 non-loopback
             return interfaces
                 .flatMap { it.inetAddresses.toList() }
                 .firstOrNull { !it.isLoopbackAddress && it is Inet4Address }
