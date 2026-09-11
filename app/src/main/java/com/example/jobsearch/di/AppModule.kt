@@ -13,10 +13,10 @@ import com.example.jobsearch.data.JobDao
 import com.example.jobsearch.data.JobDatabase
 import com.example.jobsearch.data.JobRepository
 import com.example.jobsearch.data.SettingsRepository
+import com.example.jobsearch.data.SyncRepository
 import com.example.jobsearch.data.TrainingExampleDao
 import com.example.jobsearch.data.TrainingRepository
 import com.example.jobsearch.document.DocumentExporter
-import com.example.jobsearch.network.SyncServer
 import com.example.jobsearch.parsing.HtmlRenderer
 import com.example.jobsearch.parsing.JobParser
 import com.example.jobsearch.resume.ResumeImporter
@@ -182,7 +182,7 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideSyncServer(
+    fun provideSyncRepository(
         @ApplicationContext context: Context,
         jobRepository: JobRepository,
         trainingRepository: TrainingRepository,
@@ -190,8 +190,8 @@ object AppModule {
         jobParser: JobParser,
         settingsRepository: SettingsRepository,
         systemLog: com.example.jobsearch.data.SystemLogRepository
-    ): SyncServer {
-        return SyncServer(
+    ): SyncRepository {
+        return SyncRepository(
             context,
             jobRepository,
             trainingRepository,
@@ -200,13 +200,5 @@ object AppModule {
             settingsRepository,
             systemLog
         )
-    }
-
-    @Provides
-    @Singleton
-    fun provideSyncRepository(
-        syncServer: com.example.jobsearch.network.SyncServer
-    ): com.example.jobsearch.data.SyncRepository {
-        return com.example.jobsearch.data.SyncRepository(syncServer)
     }
 }
