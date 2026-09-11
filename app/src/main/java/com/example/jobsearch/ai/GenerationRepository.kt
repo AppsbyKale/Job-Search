@@ -269,9 +269,9 @@ class GenerationRepository(
                 Log.e(TAG, "Generation failed for job $jobId", e)
                 val msg = when {
                     e.message?.contains("PERMISSION_DENIED", ignoreCase = true) == true -> 
-                        "Permission denied. Please grant 'All files access' in Settings."
+                        "Model file permission error. Go to Settings and tap 'Select Local Model File' to re-select your Gemma model."
                     e.message?.contains("initialize engine", ignoreCase = true) == true ->
-                        "Failed to load AI model. Check model file in Settings."
+                        "Failed to load AI model. Tap 'Select Local Model File' in Settings."
                     else -> e.message ?: "Unexpected error"
                 }
                 _state.value = State(jobId = jobId, error = "$msg. Please retry.")

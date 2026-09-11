@@ -1,6 +1,7 @@
 package com.example.jobsearch.ui.settings
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -258,8 +259,14 @@ class SettingsViewModel @Inject constructor(
 
     fun importCustomModel(context: Context, uri: Uri) {
         viewModelScope.launch {
-            _state.update { it.copy(busy = true, error = null, message = null) }
+            _state.update { it.copy(busy = true, error = null, message = "Importing model file into app storage...") }
             try {
+                runCatching {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                }
                 val file = withContext(Dispatchers.IO) {
                     val aiFolder = File(context.filesDir, "AI_Models")
                     if (!aiFolder.exists()) aiFolder.mkdirs()
@@ -267,7 +274,12 @@ class SettingsViewModel @Inject constructor(
                     
                     context.contentResolver.openInputStream(uri)?.use { input ->
                         destFile.outputStream().use { output ->
-                            input.copyTo(output)
+                            val buffer = ByteArray(1024 * 1024) // 1MB buffer for fast copying
+                            var bytesRead: Int
+                            while (input.read(buffer).also { bytesRead = it } != -1) {
+                                output.write(buffer, 0, bytesRead)
+                            }
+                            output.flush()
                         }
                     }
                     destFile
@@ -279,14 +291,14 @@ class SettingsViewModel @Inject constructor(
                             busy = false,
                             modelDownloaded = true,
                             modelFileSize = file.length(),
-                            message = "Model file selected and ready! (${formatBytes(file.length())})"
+                            message = "Model file imported successfully! (${formatBytes(file.length())})"
                         )
                     }
                 } else {
-                    _state.update { it.copy(busy = false, error = "Invalid model file selected.") }
+                    _state.update { it.copy(busy = false, error = "Invalid or corrupt model file selected.") }
                 }
             } catch (e: Exception) {
-                _state.update { it.copy(busy = false, error = "Failed to select model file: ${e.message}") }
+                _state.update { it.copy(busy = false, error = "Failed to import model file: ${e.message}") }
             }
         }
     }
