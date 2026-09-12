@@ -30,7 +30,7 @@ class CloudModelManager(private val settings: SettingsRepository) {
         }
 
         val model = GenerativeModel(
-            modelName = "gemini-3.5-flash-lite",
+            modelName = "gemini-3.1-flash-lite",
             apiKey = apiKey,
             generationConfig = config,
             requestOptions = RequestOptions(timeout = 120.seconds),
