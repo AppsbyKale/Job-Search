@@ -821,17 +821,26 @@ private fun LinkAndStatusSection(state: JobDetailViewModel.UiState, viewModel: J
 @Composable
 private fun StatusRow(state: JobDetailViewModel.UiState, viewModel: JobDetailViewModel) {
     val job = state.job ?: return
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        StatusBadge(
-            status = JobStatus.fromName(job.status),
-            onSelect = viewModel::setStatus
-        )
-        Spacer(Modifier.width(16.dp))
-        Text(
-            text = state.statusHint,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            StatusBadge(
+                status = JobStatus.fromName(job.status),
+                onSelectWithDate = viewModel::setStatusWithDate
+            )
+            Spacer(Modifier.width(16.dp))
+            Text(
+                text = state.statusHint,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        if (job.status == JobStatus.APPLIED.name && job.dateApplied != null) {
+            Text(
+                text = "Applied on ${DateFormatter.formatDate(job.dateApplied)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
     }
 }
 

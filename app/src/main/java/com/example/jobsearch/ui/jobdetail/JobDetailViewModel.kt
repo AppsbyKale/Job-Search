@@ -226,6 +226,17 @@ class JobDetailViewModel @Inject constructor(
         }
     }
 
+    fun setStatusWithDate(status: JobStatus, dateApplied: Long?) {
+        state.value.job?.let { job ->
+            viewModelScope.launch { 
+                repository.updateJob(job.copy(
+                    status = status.name,
+                    dateApplied = if (status == JobStatus.APPLIED) dateApplied else job.dateApplied
+                )) 
+            }
+        }
+    }
+
     private var pendingGenType: GenerationRepository.Type? = null
 
     fun generateResume() {

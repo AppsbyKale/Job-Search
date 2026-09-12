@@ -1,7 +1,6 @@
 package com.example.jobsearch.ui.joblist
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -27,7 +25,6 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.AlertDialog
@@ -39,8 +36,9 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -62,20 +60,14 @@ import com.example.jobsearch.R
 import com.example.jobsearch.data.Job
 import com.example.jobsearch.data.JobStatus
 import com.example.jobsearch.ui.components.AppCard
-import com.example.jobsearch.ui.components.SectionHeader
 import com.example.jobsearch.ui.components.StatusBadge
 import com.example.jobsearch.util.DateFormatter
-
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 
 /**
- * Screen displaying the list of saved jobs with filtering and status badges.
+ * Screen displaying the list of saved jobs with filtering and sorting dropdowns.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -89,6 +81,7 @@ fun JobListScreen(
     val jobs by viewModel.jobs.collectAsStateWithLifecycle()
     val syncedJobs by viewModel.syncedJobs.collectAsStateWithLifecycle()
     val filter by viewModel.filter.collectAsStateWithLifecycle()
+    val sortOrder by viewModel.sortOrder.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     var jobToDelete by remember { mutableStateOf<Job?>(null) }
     var isSearchExpanded by remember { mutableStateOf(false) }
@@ -188,9 +181,11 @@ fun JobListScreen(
         }
     ) { padding ->
         Column(modifier = Modifier.padding(padding)) {
-            StatusFilterRow(
-                selected = filter,
-                onSelect = viewModel::setFilter
+            SortingDropdownRow(
+                selectedFilter = filter,
+                onSelectFilter = viewModel::setFilter,
+                selectedSort = sortOrder,
+                onSelectSort = viewModel::setSortOrder
             )
             if (jobs.isEmpty()) {
                 EmptyState()
@@ -209,8 +204,8 @@ fun JobListScreen(
                         JobItemCard(
                             uiModel = uiModel,
                             onClick = { onOpenJob(uiModel.job.id) },
-                            onStatusChange = { status ->
-                                viewModel.updateStatus(uiModel.job.id, status)
+                            onStatusChangeWithDate = { status, date ->
+                                viewModel.updateStatusWithDate(uiModel.job.id, status, date)
                             },
                             onDelete = { jobToDelete = uiModel.job }
                         )
@@ -252,6 +247,83 @@ fun JobListScreen(
     }
 }
 
+@Composable
+private fun SortingDropdownRow(
+    selectedFilter: JobStatus?,
+    onSelectFilter: (JobStatus?) -> Unit,
+    selectedSort: SortOrder,
+    onSelectSort: (SortOrder) -> Unit
+) {
+    var statusExpanded by remember { mutableStateOf(false) }
+    var sortExpanded by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Status Dropdown
+        Box(modifier = Modifier.weight(1f)) {
+            OutlinedButton(
+                onClick = { statusExpanded = true },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = selectedFilter?.label ?: "All Statuses",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+            DropdownMenu(expanded = statusExpanded, onDismissRequest = { statusExpanded = false }) {
+                DropdownMenuItem(
+                    text = { Text("All Statuses") },
+                    onClick = {
+                        statusExpanded = false
+                        onSelectFilter(null)
+                    }
+                )
+                JobStatus.entries.forEach { status ->
+                    DropdownMenuItem(
+                        text = { Text(status.label) },
+                        onClick = {
+                            statusExpanded = false
+                            onSelectFilter(status)
+                        }
+                    )
+                }
+            }
+        }
+
+        // Sort Dropdown
+        Box(modifier = Modifier.weight(1f)) {
+            OutlinedButton(
+                onClick = { sortExpanded = true },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = selectedSort.label,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+            DropdownMenu(expanded = sortExpanded, onDismissRequest = { sortExpanded = false }) {
+                SortOrder.entries.forEach { sort ->
+                    DropdownMenuItem(
+                        text = { Text(sort.label) },
+                        onClick = {
+                            sortExpanded = false
+                            onSelectSort(sort)
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SyncedJobsDialog(
@@ -260,7 +332,7 @@ private fun SyncedJobsDialog(
     onDeleteJob: (Long) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var isAscending by remember { mutableStateOf(false) } // false = Newest First, true = Oldest First
+    var isAscending by remember { mutableStateOf(false) }
 
     val displayList = remember(syncedJobs, isAscending) {
         if (isAscending) syncedJobs.sortedBy { it.dateAdded }
@@ -376,7 +448,7 @@ private fun SyncedJobCard(
                     text = job.title.ifBlank { "Synced Job" },
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis
                 )
                 if (job.company.isNotBlank()) {
                     Text(
@@ -384,7 +456,7 @@ private fun SyncedJobCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
                 Text(
@@ -405,36 +477,11 @@ private fun SyncedJobCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun StatusFilterRow(selected: JobStatus?, onSelect: (JobStatus?) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        FilterChip(
-            selected = selected == null,
-            onClick = { onSelect(null) },
-            label = { Text(stringResource(R.string.filter_all)) }
-        )
-        JobStatus.entries.forEach { status ->
-            FilterChip(
-                selected = selected == status,
-                onClick = { onSelect(status) },
-                label = { Text(status.label) }
-            )
-        }
-    }
-}
-
 @Composable
 private fun JobItemCard(
     uiModel: JobListViewModel.JobUiModel,
     onClick: () -> Unit,
-    onStatusChange: (JobStatus) -> Unit,
+    onStatusChangeWithDate: (JobStatus, Long?) -> Unit,
     onDelete: () -> Unit
 ) {
     val job = uiModel.job
@@ -451,15 +498,22 @@ private fun JobItemCard(
             )
         }
         Text(
-            text = DateFormatter.formatDate(job.dateAdded),
+            text = "Added: ${DateFormatter.formatDate(job.dateAdded)}",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        if (job.status == JobStatus.APPLIED.name && job.dateApplied != null) {
+            Text(
+                text = "Applied on ${DateFormatter.formatDate(job.dateApplied)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
         Spacer(Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             StatusBadge(
                 status = JobStatus.fromName(job.status),
-                onSelect = onStatusChange
+                onSelectWithDate = onStatusChangeWithDate
             )
             Spacer(Modifier.width(8.dp))
             if (job.hasResume) {

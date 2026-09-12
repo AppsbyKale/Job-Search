@@ -11,6 +11,7 @@ data class Job(
     val url: String = "",
     val description: String = "",
     val dateAdded: Long = System.currentTimeMillis(),
+    val dateApplied: Long? = null,
     val status: String = JobStatus.SAVED.name,
     val resumeText: String = "",
     val coverLetterText: String = "",

@@ -1,6 +1,7 @@
 package com.example.jobsearch.ui.jobdetail.components
 
 import android.content.ClipData
+import com.example.jobsearch.util.DateFormatter
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -113,16 +114,25 @@ fun LinkAndStatusSection(state: JobDetailViewModel.UiState, viewModel: JobDetail
 @Composable
 fun StatusRow(state: JobDetailViewModel.UiState, viewModel: JobDetailViewModel) {
     val job = state.job ?: return
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        StatusBadge(
-            status = JobStatus.fromName(job.status),
-            onSelect = viewModel::setStatus
-        )
-        Spacer(Modifier.width(16.dp))
-        Text(
-            text = state.statusHint,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            StatusBadge(
+                status = JobStatus.fromName(job.status),
+                onSelectWithDate = viewModel::setStatusWithDate
+            )
+            Spacer(Modifier.width(16.dp))
+            Text(
+                text = state.statusHint,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        if (job.status == JobStatus.APPLIED.name && job.dateApplied != null) {
+            Text(
+                text = "Applied on ${DateFormatter.formatDate(job.dateApplied)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
     }
 }
