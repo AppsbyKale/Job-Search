@@ -315,7 +315,7 @@ class SettingsViewModel @Inject constructor(
                     destFile
                 }
 
-                if (realFile.exists() && realFile.length() > 100_000_000L) {
+                if (realFile.exists() && realFile.length() >= SettingsRepository.MIN_MODEL_SIZE_BYTES) {
                     settingsRepository.setCustomModelPath(realFile.absolutePath)
                     _state.update {
                         it.copy(
@@ -326,7 +326,12 @@ class SettingsViewModel @Inject constructor(
                         )
                     }
                 } else {
-                    _state.update { it.copy(busy = false, error = "Invalid model file selected.") }
+                    _state.update { 
+                        it.copy(
+                            busy = false, 
+                            error = "Selected file is incomplete or corrupted (${formatBytes(realFile.length())}). Gemma 4 model must be ~1.72 GB."
+                        ) 
+                    }
                 }
             } catch (e: Exception) {
                 Log.e("SettingsViewModel", "Failed to select model file", e)

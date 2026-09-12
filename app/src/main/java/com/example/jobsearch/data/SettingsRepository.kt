@@ -146,23 +146,23 @@ class SettingsRepository(private val context: Context) {
             val custom = getCustomModelPath()
             if (custom.isNotBlank()) {
                 val f = File(custom)
-                if (f.exists() && f.length() > 100_000_000L) {
+                if (f.exists() && f.length() >= MIN_MODEL_SIZE_BYTES) {
                     return f
                 }
             }
             val aiFolder = File(context.filesDir, "AI_Models")
             if (!aiFolder.exists()) aiFolder.mkdirs()
             val defaultFile = File(aiFolder, "Gemma-4-E2B-it.litertlm")
-            if (defaultFile.exists()) return defaultFile
+            if (defaultFile.exists() && defaultFile.length() >= MIN_MODEL_SIZE_BYTES) return defaultFile
 
-            val anyModel = aiFolder.listFiles()?.firstOrNull { it.name.endsWith(".litertlm") && it.length() > 100_000_000L }
+            val anyModel = aiFolder.listFiles()?.firstOrNull { it.name.endsWith(".litertlm") && it.length() >= MIN_MODEL_SIZE_BYTES }
             return anyModel ?: defaultFile
         }
 
     companion object {
         const val DEFAULT_MODEL_URL =
             "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm"
-        const val MIN_MODEL_SIZE_BYTES = 1_000_000_000L // 1GB
+        const val MIN_MODEL_SIZE_BYTES = 1_500_000_000L // 1.5GB
         const val DEFAULT_SYNC_PORT = 8080
     }
 }

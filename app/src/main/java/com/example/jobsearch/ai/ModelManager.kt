@@ -49,7 +49,7 @@ class ModelManager(
 
     override fun isModelDownloaded(): Boolean {
         val file = modelFile
-        return file.exists() && (file.length() > 100_000_000L)
+        return file.exists() && (file.length() >= SettingsRepository.MIN_MODEL_SIZE_BYTES)
     }
 
     override fun isEngineLoaded(): Boolean = engine != null
