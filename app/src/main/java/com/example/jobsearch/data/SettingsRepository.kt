@@ -133,16 +133,17 @@ class SettingsRepository(private val context: Context) {
         return url.contains("google/") || url.contains("gemma-3") || url.contains("E4B")
     }
 
-    private val keyCustomModelPath = stringPreferencesKey("custom_model_path")
-    val customModelPath: Flow<String> = context.dataStore.data.map { it[keyCustomModelPath] ?: "" }
+    fun setCustomModelPath(path: String) {
+        securePrefs.edit().putString("custom_model_path", path).apply()
+    }
 
-    suspend fun setCustomModelPath(path: String) {
-        context.dataStore.edit { it[keyCustomModelPath] = path }
+    fun getCustomModelPath(): String {
+        return securePrefs.getString("custom_model_path", "") ?: ""
     }
 
     val modelFile: File
         get() {
-            val custom = runBlocking { customModelPath.first() }
+            val custom = getCustomModelPath()
             if (custom.isNotBlank()) {
                 val f = File(custom)
                 if (f.exists() && f.length() > 100_000_000L) {
@@ -151,7 +152,11 @@ class SettingsRepository(private val context: Context) {
             }
             val aiFolder = File(context.filesDir, "AI_Models")
             if (!aiFolder.exists()) aiFolder.mkdirs()
-            return File(aiFolder, "Gemma-4-E2B-it.litertlm")
+            val defaultFile = File(aiFolder, "Gemma-4-E2B-it.litertlm")
+            if (defaultFile.exists()) return defaultFile
+
+            val anyModel = aiFolder.listFiles()?.firstOrNull { it.name.endsWith(".litertlm") && it.length() > 100_000_000L }
+            return anyModel ?: defaultFile
         }
 
     companion object {
