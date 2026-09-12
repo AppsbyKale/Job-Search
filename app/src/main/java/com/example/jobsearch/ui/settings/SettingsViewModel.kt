@@ -3,6 +3,8 @@ package com.example.jobsearch.ui.settings
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.MediaStore
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.jobsearch.ai.IModelManager
@@ -259,22 +261,50 @@ class SettingsViewModel @Inject constructor(
 
     fun importCustomModel(context: Context, uri: Uri) {
         viewModelScope.launch {
-            _state.update { it.copy(busy = true, error = null, message = "Importing model file into app storage...") }
+            _state.update { it.copy(busy = true, error = null, message = "Checking selected model file...") }
             try {
-                runCatching {
-                    context.contentResolver.takePersistableUriPermission(
-                        uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION
-                    )
-                }
-                val file = withContext(Dispatchers.IO) {
+                val realFile = withContext(Dispatchers.IO) {
+                    // 1. Try to resolve direct file path on disk without duplicating 2GB
+                    var resolvedPath: String? = null
+                    if (uri.scheme == "file") {
+                        resolvedPath = uri.path
+                    } else if (uri.scheme == "content") {
+                        runCatching {
+                            context.contentResolver.query(uri, arrayOf(MediaStore.MediaColumns.DATA), null, null, null)?.use { cursor ->
+                                if (cursor.moveToFirst()) {
+                                    val idx = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
+                                    if (idx >= 0) resolvedPath = cursor.getString(idx)
+                                }
+                            }
+                        }
+                    }
+
+                    if (!resolvedPath.isNullOrBlank()) {
+                        val directFile = File(resolvedPath!!)
+                        if (directFile.exists() && directFile.canRead() && directFile.length() > 100_000_000L) {
+                            return@withContext directFile
+                        }
+                    }
+
+                    // 2. Fallback: Copy to app-private storage only if sufficient disk space exists
+                    val fileSize = runCatching {
+                        context.contentResolver.openFileDescriptor(uri, "r")?.use { it.statSize } ?: 0L
+                    }.getOrDefault(0L)
+
+                    val freeSpace = context.filesDir.usableSpace
+                    if (fileSize > 0 && freeSpace < fileSize + 200_000_000L) {
+                        throw IllegalStateException(
+                            "Insufficient storage space. Free space: ${formatBytes(freeSpace)}, required: ${formatBytes(fileSize)}."
+                        )
+                    }
+
                     val aiFolder = File(context.filesDir, "AI_Models")
                     if (!aiFolder.exists()) aiFolder.mkdirs()
                     val destFile = File(aiFolder, "Gemma-4-E2B-it.litertlm")
-                    
+
                     context.contentResolver.openInputStream(uri)?.use { input ->
                         destFile.outputStream().use { output ->
-                            val buffer = ByteArray(1024 * 1024) // 1MB buffer for fast copying
+                            val buffer = ByteArray(512 * 1024)
                             var bytesRead: Int
                             while (input.read(buffer).also { bytesRead = it } != -1) {
                                 output.write(buffer, 0, bytesRead)
@@ -284,21 +314,23 @@ class SettingsViewModel @Inject constructor(
                     }
                     destFile
                 }
-                if (file.exists() && file.length() > 100_000_000L) {
-                    settingsRepository.setCustomModelPath(file.absolutePath)
+
+                if (realFile.exists() && realFile.length() > 100_000_000L) {
+                    settingsRepository.setCustomModelPath(realFile.absolutePath)
                     _state.update {
                         it.copy(
                             busy = false,
                             modelDownloaded = true,
-                            modelFileSize = file.length(),
-                            message = "Model file imported successfully! (${formatBytes(file.length())})"
+                            modelFileSize = realFile.length(),
+                            message = "Model file selected and ready! (${formatBytes(realFile.length())})"
                         )
                     }
                 } else {
-                    _state.update { it.copy(busy = false, error = "Invalid or corrupt model file selected.") }
+                    _state.update { it.copy(busy = false, error = "Invalid model file selected.") }
                 }
             } catch (e: Exception) {
-                _state.update { it.copy(busy = false, error = "Failed to import model file: ${e.message}") }
+                Log.e("SettingsViewModel", "Failed to select model file", e)
+                _state.update { it.copy(busy = false, error = "Failed to select model file: ${e.message}") }
             }
         }
     }
