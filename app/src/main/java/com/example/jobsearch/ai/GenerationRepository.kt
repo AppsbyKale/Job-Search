@@ -133,7 +133,7 @@ class GenerationRepository(
                 val distilledFacts = try {
                     withTimeout(120.seconds) {
                         Log.d(TAG, "Calling cloudModelManager.generate for distillation...")
-                        cloudModelManager.generate(distillPrompt).trim()
+                        generateCloudOrLocalFallback(distillPrompt, "distillation")
                     }
                 } catch (e: TimeoutCancellationException) {
                     systemLog.log("ERROR: Phase 1 timed out after 2 minutes.")
@@ -151,15 +151,15 @@ class GenerationRepository(
                 )
                 delay(500)
 
-                // Step 1.5: Q&A Enrichment (Fallback to Cloud if local failed to include it well)
+                // Step 1.5: Q&A Enrichment
                 var finalDistilled = distilledFacts
                 if (includeQa && qaPairs.isNotEmpty() && !distilledFacts.contains(qaPairs.first().second.take(10))) {
                     updateProgress("Integrating Q&A facts...", 0.25f)
-                    Log.d(TAG, "Phase 1.5: Weaving ${qaPairs.size} Q&A answers into distilled facts using Cloud AI...")
+                    Log.d(TAG, "Phase 1.5: Weaving ${qaPairs.size} Q&A answers into distilled facts...")
                     val enrichPrompt = "Incorporate these interview Q&A facts into the distilled resume facts. Maintain JSON structure.\n\nQ&A:\n" +
                         qaPairs.joinToString("\n") { "Q: ${it.first}\nA: ${it.second}" } +
                         "\n\nDistilled Facts:\n$distilledFacts"
-                    finalDistilled = cloudModelManager.generate(enrichPrompt).trim()
+                    finalDistilled = generateCloudOrLocalFallback(enrichPrompt, "enrichment")
                     delay(500)
                 }
 
@@ -167,10 +167,10 @@ class GenerationRepository(
                 if (type == Type.RESUME || type == Type.BOTH) {
                     updateProgress("Tailoring experience...", 0.45f)
                     val resumePrompt = PromptBuilder.resumePrompt(updated, resume, finalDistilled, emptyList(), steeringPrompt)
-                    Log.d(TAG, "Phase 2: Sending resume tailoring prompt to Cloud AI...")
-                    val resumeResult = cloudModelManager.generate(resumePrompt).trim()
+                    Log.d(TAG, "Phase 2: Sending resume tailoring prompt...")
+                    val resumeResult = generateCloudOrLocalFallback(resumePrompt, "resume_tailoring")
 
-                    if (resumeResult.isBlank()) throw IllegalStateException("Cloud AI returned an empty resume.")
+                    if (resumeResult.isBlank()) throw IllegalStateException("AI returned an empty resume.")
                     
                     trainingRepository.logExample(
                         appName = "task",
@@ -192,8 +192,8 @@ class GenerationRepository(
                     
                     val resumeSource = updated.resumeText.ifBlank { resume }
                     val coverPrompt = PromptBuilder.coverLetterPrompt(updated, resumeSource, coverSteeringPrompt)
-                    Log.d(TAG, "Sending cover letter prompt to Cloud AI...")
-                    val coverResult = cloudModelManager.generate(coverPrompt).trim()
+                    Log.d(TAG, "Sending cover letter prompt...")
+                    val coverResult = generateCloudOrLocalFallback(coverPrompt, "cover_letter")
 
                     if (coverResult.isBlank()) throw IllegalStateException("Failed to generate cover letter.")
                     
@@ -268,6 +268,9 @@ class GenerationRepository(
                 crawlJob?.cancel()
                 Log.e(TAG, "Generation failed for job $jobId", e)
                 val msg = when {
+                    e.message?.contains("denied access", ignoreCase = true) == true ||
+                    e.message?.contains("403", ignoreCase = true) == true -> 
+                        "Gemini API Key Error: Access denied (HTTP 403). Enter a valid Gemini API key in Settings -> Cloud AI, or download Gemma for Local AI."
                     e.message?.contains("PERMISSION_DENIED", ignoreCase = true) == true -> 
                         "Model file permission error. Go to Settings and tap 'Select Local Model File' to re-select your Gemma model."
                     e.message?.contains("initialize engine", ignoreCase = true) == true ->
@@ -280,6 +283,24 @@ class GenerationRepository(
             }
         }
         activeJob = launched
+    }
+
+    private suspend fun generateCloudOrLocalFallback(prompt: String, feature: String): String {
+        return try {
+            val result = cloudModelManager.generate(prompt).trim()
+            if (result.isNotBlank()) result
+            else throw IllegalStateException("Cloud Gemini returned empty response.")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            Log.w(TAG, "Cloud Gemini failed for $feature, attempting Local AI fallback...", e)
+            if (modelManager.isModelDownloaded()) {
+                systemLog.log("Cloud Gemini unavailable (${e.message}). Falling back to Local AI for $feature...")
+                modelManager.generate(prompt, source = "Local Fallback ($feature)").trim()
+            } else {
+                throw e
+            }
+        }
     }
 
     private fun updateProgress(label: String, progress: Float) {
