@@ -1,22 +1,25 @@
 package com.example.jobsearch.ui.components
 
-import android.app.DatePickerDialog
 import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.SuggestionChipDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 import com.example.jobsearch.data.JobStatus
-import java.util.Calendar
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StatusBadge(
     status: JobStatus,
@@ -24,7 +27,8 @@ fun StatusBadge(
     onSelectWithDate: ((JobStatus, Long?) -> Unit)? = null
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val context = LocalContext.current
+    var showDatePicker by remember { mutableStateOf(false) }
+    val datePickerState = rememberDatePickerState()
     
     val containerColor = when (status) {
         JobStatus.SYNCED -> MaterialTheme.colorScheme.secondaryContainer
@@ -62,23 +66,7 @@ fun StatusBadge(
                         onClick = {
                             expanded = false
                             if (s == JobStatus.APPLIED) {
-                                val cal = Calendar.getInstance()
-                                DatePickerDialog(
-                                    context,
-                                    { _, year, month, dayOfMonth ->
-                                        val selectedCal = Calendar.getInstance().apply {
-                                            set(year, month, dayOfMonth, 0, 0, 0)
-                                        }
-                                        if (onSelectWithDate != null) {
-                                            onSelectWithDate(s, selectedCal.timeInMillis)
-                                        } else {
-                                            onSelect?.invoke(s)
-                                        }
-                                    },
-                                    cal.get(Calendar.YEAR),
-                                    cal.get(Calendar.MONTH),
-                                    cal.get(Calendar.DAY_OF_MONTH)
-                                ).show()
+                                showDatePicker = true
                             } else {
                                 onSelectWithDate?.invoke(s, null)
                                 onSelect?.invoke(s)
@@ -86,6 +74,31 @@ fun StatusBadge(
                         }
                     )
                 }
+            }
+        }
+
+        if (showDatePicker) {
+            DatePickerDialog(
+                onDismissRequest = { showDatePicker = false },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showDatePicker = false
+                            val selectedMillis = datePickerState.selectedDateMillis
+                            onSelectWithDate?.invoke(JobStatus.APPLIED, selectedMillis)
+                            onSelect?.invoke(JobStatus.APPLIED)
+                        }
+                    ) {
+                        Text("OK")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDatePicker = false }) {
+                        Text("Cancel")
+                    }
+                }
+            ) {
+                DatePicker(state = datePickerState)
             }
         }
     }
