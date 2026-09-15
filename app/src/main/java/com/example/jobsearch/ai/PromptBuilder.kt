@@ -71,10 +71,12 @@ object PromptBuilder {
         val steering = if (steeringInstructions.isNullOrBlank()) "" else 
             "\n**USER STEERING INSTRUCTIONS (PRIORITIZE THESE):**\n$steeringInstructions\n"
 
-        val jobInfo = "Job: ${job.title} at ${job.company}\nDescription: ${truncateWords(job.description, 200)}"
+        val jobInfo = "TARGET JOB TO APPLY FOR (DO NOT list this as past work experience in the resume!):\nTitle: ${job.title}\nCompany: ${job.company}\nDescription: ${truncateWords(job.description, 200)}"
         
         val head = """
-            Rewrite this resume using these facts. **IMPORTANT: Ensure ALL jobs and dates from the base resume are included in the tailored output. Each job must have between 2 and 10 bullet points.** JSON ONLY.
+            Rewrite this resume using these facts. **IMPORTANT: Ensure ALL jobs and dates from the base resume are included in the tailored output. Each job must have between 2 and 10 bullet points.** 
+            CRITICAL RULE: The target job above is the role the candidate is APPLYING FOR. DO NOT list this target company or role as past employment/experience in the resume's experience array. 
+            JSON ONLY.
             $steering
             Facts:
             $distilledFacts
@@ -328,11 +330,10 @@ object PromptBuilder {
             <JOB TITLE>
             ${job.title}
 
-            <COMPANY>
-            ${truncateWords(job.company, MAX_COMPANY_WORDS)}
-
-            <JOB DESCRIPTION>
-            $description
+            <TARGET JOB TO APPLY FOR (DO NOT list this as past work experience!)>
+            Title: ${job.title}
+            Company: ${truncateWords(job.company, MAX_COMPANY_WORDS)}
+            Description: $description
         """.trimIndent()
     }
 
@@ -344,19 +345,17 @@ object PromptBuilder {
         }.joinToString("\n\n")
         return """
             $BASE_SYSTEM
-            The data below is the candidate's employment history. Rewrite the resume so it is tailored to the job posting and incorporates the follow-up answers. **IMPORTANT: Ensure ALL jobs and dates from the base resume are included in the tailored output. Each job must have between 2 and 10 bullet points.** Never invent facts.
+            The data below is the candidate's employment history. Rewrite the resume so it is tailored to the job posting and incorporates the follow-up answers. **IMPORTANT: Ensure ALL jobs and dates from the base resume are included in the tailored output. Each job must have between 2 and 10 bullet points.** 
+            CRITICAL RULE: The target job/company below is the role the candidate is APPLYING FOR. DO NOT list this target company or role as past employment/experience in the resume's experience array. 
+            Never invent facts.
 
             <RAW EXPERIENCE FACTS>
             $resume
 
-            <JOB TITLE>
-            ${job.title}
-
-            <COMPANY>
-            ${truncateWords(job.company, MAX_COMPANY_WORDS)}
-
-            <JOB DESCRIPTION>
-            $description
+            <TARGET JOB TO APPLY FOR (DO NOT list this as past work experience!)>
+            Title: ${job.title}
+            Company: ${truncateWords(job.company, MAX_COMPANY_WORDS)}
+            Description: $description
 
             <CANDIDATE ANSWERS>
             $qaText
