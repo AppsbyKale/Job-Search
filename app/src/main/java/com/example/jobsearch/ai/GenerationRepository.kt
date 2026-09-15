@@ -191,7 +191,7 @@ class GenerationRepository(
                     updateProgress("Finalizing documents...", if (type == Type.BOTH) 0.85f else 0.6f)
                     
                     val resumeSource = updated.resumeText.ifBlank { resume }
-                    val coverPrompt = PromptBuilder.coverLetterPrompt(updated, resumeSource, coverSteeringPrompt)
+                    val coverPrompt = PromptBuilder.coverLetterPrompt(updated, resumeSource, qaPairs, coverSteeringPrompt)
                     Log.d(TAG, "Sending cover letter prompt...")
                     val coverResult = generateCloudOrLocalFallback(coverPrompt, "cover_letter")
 
