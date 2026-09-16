@@ -57,6 +57,7 @@ class SettingsViewModel @Inject constructor(
         val resumeFileName: String = "",
         val modelUrl: String = SettingsRepository.DEFAULT_MODEL_URL,
         val geminiApiKey: String = "",
+        val langSearchApiKey: String = "",
         val modelDownloaded: Boolean = false,
         val modelFileSize: Long = 0,
         val partialBytes: Long = 0,
@@ -135,6 +136,7 @@ class SettingsViewModel @Inject constructor(
             val name = settingsRepository.resumeFileName.first()
             val url = settingsRepository.getModelUrl() // Use fixed method
             val apiKey = settingsRepository.geminiApiKey.first()
+            val langKey = settingsRepository.langSearchApiKey.first()
             val useCustom = settingsRepository.useCustomApiKey.first()
             _state.update {
                 it.copy(
@@ -142,6 +144,7 @@ class SettingsViewModel @Inject constructor(
                     resumeFileName = name,
                     modelUrl = url,
                     geminiApiKey = apiKey,
+                    langSearchApiKey = langKey,
                     useCustomApiKey = useCustom
                 )
             }
@@ -150,6 +153,10 @@ class SettingsViewModel @Inject constructor(
 
     fun onGeminiApiKeyChange(value: String) {
         _state.update { it.copy(geminiApiKey = value) }
+    }
+
+    fun onLangSearchApiKeyChange(value: String) {
+        _state.update { it.copy(langSearchApiKey = value) }
     }
 
     fun toggleUseCustomApiKey(use: Boolean) {
@@ -165,6 +172,15 @@ class SettingsViewModel @Inject constructor(
             systemLogRepository.log("Saved Gemini API Key")
             settingsRepository.setGeminiApiKey(key)
             _state.update { it.copy(message = "Gemini API key saved.") }
+        }
+    }
+
+    fun saveLangSearchApiKey() {
+        viewModelScope.launch {
+            val key = _state.value.langSearchApiKey.trim()
+            systemLogRepository.log("Saved LangSearch API Key")
+            settingsRepository.setLangSearchApiKey(key)
+            _state.update { it.copy(message = "LangSearch API key saved.") }
         }
     }
 

@@ -21,7 +21,9 @@ data class Job(
     val notes: String = "",
     val externalResumeText: String = "",
     val externalCoverLetterText: String = "",
-    val tags: String = ""
+    val tags: String = "",
+    val companyInfo: String = "",
+    val cheatSheetCustomQuestions: String = ""
 ) {
     val hasResume: Boolean get() = resumeText.isNotBlank()
     val hasCoverLetter: Boolean get() = coverLetterText.isNotBlank()

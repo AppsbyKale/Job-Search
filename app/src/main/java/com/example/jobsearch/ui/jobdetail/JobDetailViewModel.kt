@@ -76,6 +76,8 @@ class JobDetailViewModel @Inject constructor(
         val showSupplementalDialog: Boolean = false,
         val showInitialEmailDialog: Boolean = false,
         val showCheatSheetDialog: Boolean = false,
+        val showCompanyInfoDialog: Boolean = false,
+        val showCheatSheetOptionsDialog: Boolean = false,
         val showFollowUpDialog: Boolean = false,
         val showMatchAnalysisDialog: Boolean = false,
         val showJobDescriptionDialog: Boolean = false,
@@ -101,6 +103,8 @@ class JobDetailViewModel @Inject constructor(
     private val _showSupplementalDialog = MutableStateFlow(false)
     private val _showInitialEmailDialog = MutableStateFlow(false)
     private val _showCheatSheetDialog = MutableStateFlow(false)
+    private val _showCompanyInfoDialog = MutableStateFlow(false)
+    private val _showCheatSheetOptionsDialog = MutableStateFlow(false)
     private val _showFollowUpDialog = MutableStateFlow(false)
     private val _showMatchAnalysisDialog = MutableStateFlow(false)
     private val _showJobDescriptionDialog = MutableStateFlow(false)
@@ -128,6 +132,8 @@ class JobDetailViewModel @Inject constructor(
         _showSupplementalDialog,
         _showInitialEmailDialog,
         _showCheatSheetDialog,
+        _showCompanyInfoDialog,
+        _showCheatSheetOptionsDialog,
         _showFollowUpDialog,
         _showMatchAnalysisDialog,
         _showJobDescriptionDialog,
@@ -153,24 +159,26 @@ class JobDetailViewModel @Inject constructor(
         val supp = args[5] as Boolean
         val initialEmailShow = args[6] as Boolean
         val cheat = args[7] as Boolean
-        val follow = args[8] as Boolean
-        val matchAnalysis = args[9] as Boolean
-        val jobDesc = args[10] as Boolean
-        val showInterview = args[11] as Boolean
-        val showAskAi = args[12] as Boolean
-        val showNotes = args[13] as Boolean
-        val externalUploadShow = args[14] as Boolean
+        val companyInfoShow = args[8] as Boolean
+        val cheatOptionsShow = args[9] as Boolean
+        val follow = args[10] as Boolean
+        val matchAnalysis = args[11] as Boolean
+        val jobDesc = args[12] as Boolean
+        val showInterview = args[13] as Boolean
+        val showAskAi = args[14] as Boolean
+        val showNotes = args[15] as Boolean
+        val externalUploadShow = args[16] as Boolean
         @Suppress("UNCHECKED_CAST")
-        val questions = args[15] as List<InterviewQuestion>
+        val questions = args[17] as List<InterviewQuestion>
         @Suppress("UNCHECKED_CAST")
-        val answers = args[16] as List<InterviewAnswer>
-        val qRunning = args[17] as Boolean
-        // args[18] is downloadProgress
-        val mResult = args[19] as MatchResult?
-        val mRunning = args[20] as Boolean
-        val steeringShow = args[21] as Boolean
-        val steeringPrompt = args[22] as String
-        val coverSteeringPrompt = args[23] as String
+        val answers = args[18] as List<InterviewAnswer>
+        val qRunning = args[19] as Boolean
+        // args[20] is downloadProgress
+        val mResult = args[21] as MatchResult?
+        val mRunning = args[22] as Boolean
+        val steeringShow = args[23] as Boolean
+        val steeringPrompt = args[24] as String
+        val coverSteeringPrompt = args[25] as String
 
         val statusObj = job?.let { JobStatus.fromName(it.status) } ?: JobStatus.SAVED
         val hint = when (statusObj) {
@@ -199,6 +207,8 @@ class JobDetailViewModel @Inject constructor(
             showSupplementalDialog = supp,
             showInitialEmailDialog = initialEmailShow,
             showCheatSheetDialog = cheat,
+            showCompanyInfoDialog = companyInfoShow,
+            showCheatSheetOptionsDialog = cheatOptionsShow,
             showFollowUpDialog = follow,
             showMatchAnalysisDialog = matchAnalysis,
             showJobDescriptionDialog = jobDesc,
@@ -441,14 +451,40 @@ class JobDetailViewModel @Inject constructor(
         generate(type)
     }
 
-    fun generateCheatSheet() {
+    fun showCompanyInfo(show: Boolean) {
+        _showCompanyInfoDialog.value = show
+    }
+
+    fun showCheatSheetOptions(show: Boolean) {
+        _showCheatSheetOptionsDialog.value = show
+    }
+
+    fun generateCheatSheet(
+        includeOverview: Boolean = true,
+        includeChallenges: Boolean = true,
+        includeDayToDay: Boolean = true,
+        includeHighlights: Boolean = true,
+        customQuestions: String = "",
+        strengths: String = "",
+        weaknesses: String = ""
+    ) {
+        _showCheatSheetOptionsDialog.value = false
         val s = state.value
         if (s.generating != null) return
         if (!s.modelReady) {
             _notice.value = "The AI model is not downloaded yet. Go to Settings and download it first."
             return
         }
-        generationRepository.generateCheatSheet(jobId)
+        generationRepository.generateCheatSheet(
+            jobId = jobId,
+            includeOverview = includeOverview,
+            includeChallenges = includeChallenges,
+            includeDayToDay = includeDayToDay,
+            includeHighlights = includeHighlights,
+            customQuestions = customQuestions,
+            strengths = strengths,
+            weaknesses = weaknesses
+        )
     }
 
     fun toggleQaAnswers(enabled: Boolean) {

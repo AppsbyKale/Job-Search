@@ -57,6 +57,10 @@ class SettingsRepository(private val context: Context) {
     val geminiApiKey: Flow<String> = context.dataStore.data.map {
         securePrefs.getString("secure_gemini_api_key", null) ?: it[keyGeminiApiKey] ?: ""
     }
+    private val keyLangSearchApiKey = stringPreferencesKey("lang_search_api_key")
+    val langSearchApiKey: Flow<String> = context.dataStore.data.map {
+        securePrefs.getString("secure_lang_search_api_key", null) ?: it[keyLangSearchApiKey] ?: ""
+    }
     val useCustomApiKey: Flow<Boolean> = context.dataStore.data.map { it[keyUseCustomApiKey] ?: false }
     val desktopSyncEnabled: Flow<Boolean> = context.dataStore.data.map { it[keyDesktopSyncEnabled] ?: true }
     val desktopSyncPort: Flow<Int> = context.dataStore.data.map { it[keyDesktopSyncPort] ?: DEFAULT_SYNC_PORT }
@@ -81,6 +85,11 @@ class SettingsRepository(private val context: Context) {
     suspend fun setGeminiApiKey(key: String) {
         securePrefs.edit().putString("secure_gemini_api_key", key).apply()
         context.dataStore.edit { it[keyGeminiApiKey] = key }
+    }
+
+    suspend fun setLangSearchApiKey(key: String) {
+        securePrefs.edit().putString("secure_lang_search_api_key", key).apply()
+        context.dataStore.edit { it[keyLangSearchApiKey] = key }
     }
 
     suspend fun setUseCustomApiKey(use: Boolean) {

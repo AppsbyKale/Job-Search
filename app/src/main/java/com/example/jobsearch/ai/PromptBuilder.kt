@@ -385,18 +385,43 @@ object PromptBuilder {
         """.trimIndent()
     }
 
-    fun cheatSheetPrompt(job: Job, resumeText: String): String {
+    fun cheatSheetPrompt(
+        job: Job,
+        resumeText: String,
+        companyInfo: String = "",
+        includeOverview: Boolean = true,
+        includeChallenges: Boolean = true,
+        includeDayToDay: Boolean = true,
+        includeHighlights: Boolean = true,
+        customQuestions: String = "",
+        strengths: String = "",
+        weaknesses: String = ""
+    ): String {
         val resume = truncateWords(resumeText, MAX_RESUME_WORDS)
         val description = truncateWords(job.description, MAX_JOB_WORDS)
+        
+        val companyBlock = if (companyInfo.isNotBlank()) "\n<COMPANY BACKGROUND & INSIGHTS>\n$companyInfo\n" else ""
+        val strengthsBlock = if (strengths.isNotBlank()) "\n<CANDIDATE STRENGTHS TO HIGHLIGHT>\n$strengths\n" else ""
+        val weaknessesBlock = if (weaknesses.isNotBlank()) "\n<CANDIDATE WEAKNESSES/GAPS TO ADDRESS>\n$weaknesses\n" else ""
+        val customBlock = if (customQuestions.isNotBlank()) "\n<USER CUSTOM INTERVIEW QUESTIONS TO ANSWER>\n$customQuestions\n" else ""
+
+        val focusInstructions = buildList {
+            if (includeOverview) add("- Include company culture, overview, and mission insights.")
+            if (includeChallenges) add("- Address potential challenges of the role.")
+            if (includeDayToDay) add("- Include day-to-day responsibilities and expectations.")
+            if (includeHighlights) add("- Highlight key qualifications and selling points.")
+        }.joinToString("\n")
+
         return """
-            You are an expert interview coach. Create a concise "Interview Cheat Sheet" for the candidate based on the job and their resume.
+            You are an expert interview coach. Create a concise "Interview Cheat Sheet" for the candidate based on the job, company info, and their resume.
             Focus on high-impact points and preparing for difficult questions.
+
+            FOCUS INSTRUCTIONS:
+            $focusInstructions
 
             STRICT RULES:
             - keyHighlights: 4-5 bullet points of the candidate's strongest selling points for THIS specific job.
-            - toughQuestions: Generate 6 questions total:
-                1. 3 Standard Questions (e.g., "Tell me about yourself", "Why should we hire you?", "Strengths/Weaknesses").
-                2. 3 Job-Specific Questions (tailored to this role and the candidate's specific background).
+            - toughQuestions: Generate questions including any user custom questions above, plus job-specific and standard questions.
             - For each question, provide a "strategy" and a "exampleAnswer" (a 2-3 sentence first-person response).
             - Output ONLY raw JSON. No markdown.
 
@@ -404,20 +429,22 @@ object PromptBuilder {
             {
               "keyHighlights": ["Point 1", "Point 2", "Point 3", "Point 4"],
               "toughQuestions": [
-                { "question": "Q1", "strategy": "Strategy 1", "exampleAnswer": "I would say..." },
-                { "question": "Q2", "strategy": "Strategy 2", "exampleAnswer": "In my previous role..." },
-                { "question": "Q3", "strategy": "Strategy 3", "exampleAnswer": "I approach this by..." },
-                { "question": "Q4", "strategy": "Strategy 4", "exampleAnswer": "..." },
-                { "question": "Q5", "strategy": "Strategy 5", "exampleAnswer": "..." },
-                { "question": "Q6", "strategy": "Strategy 6", "exampleAnswer": "..." }
+                { "question": "Q1", "strategy": "Strategy 1", "exampleAnswer": "I would say..." }
               ]
             }
+            $companyBlock
+            $strengthsBlock
+            $weaknessesBlock
+            $customBlock
 
             <CANDIDATE RESUME>
             $resume
 
             <JOB TITLE>
             ${job.title}
+
+            <COMPANY>
+            ${job.company}
 
             <JOB DESCRIPTION>
             $description

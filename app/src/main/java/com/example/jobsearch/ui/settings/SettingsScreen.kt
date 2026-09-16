@@ -263,7 +263,9 @@ fun SettingsScreen(
                         state = state,
                         onApiKeyChange = viewModel::onGeminiApiKeyChange,
                         onSaveKey = viewModel::saveGeminiApiKey,
-                        onToggleUseCustom = viewModel::toggleUseCustomApiKey
+                        onToggleUseCustom = viewModel::toggleUseCustomApiKey,
+                        onLangSearchKeyChange = viewModel::onLangSearchApiKeyChange,
+                        onSaveLangSearchKey = viewModel::saveLangSearchApiKey
                     )
                 }
 
@@ -405,7 +407,9 @@ private fun CloudAiSection(
     state: SettingsViewModel.UiState,
     onApiKeyChange: (String) -> Unit,
     onSaveKey: () -> Unit,
-    onToggleUseCustom: (Boolean) -> Unit
+    onToggleUseCustom: (Boolean) -> Unit,
+    onLangSearchKeyChange: (String) -> Unit,
+    onSaveLangSearchKey: () -> Unit
 ) {
     AppCard(modifier = Modifier.fillMaxWidth()) {
         SectionHeader(stringResource(R.string.cloud_ai_section_title))
@@ -443,6 +447,21 @@ private fun CloudAiSection(
                 enabled = !state.busy,
                 modifier = Modifier.fillMaxWidth()
             ) { Text(stringResource(R.string.save_key_button)) }
+
+            Spacer(Modifier.height(16.dp))
+            OutlinedTextField(
+                value = state.langSearchApiKey,
+                onValueChange = onLangSearchKeyChange,
+                label = { Text("LangSearch API Key") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = onSaveLangSearchKey,
+                enabled = !state.busy,
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Save LangSearch API Key") }
         }
     }
 }

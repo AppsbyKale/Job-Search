@@ -40,6 +40,8 @@ import com.example.jobsearch.ui.components.ErrorCard
 import com.example.jobsearch.ui.components.SectionHeader
 import com.example.jobsearch.ui.components.StatusBadge
 import com.example.jobsearch.ui.interview.InterviewDialog
+import com.example.jobsearch.ui.jobdetail.components.CompanyInfoDialog
+import com.example.jobsearch.ui.jobdetail.components.CheatSheetOptionsDialog
 import com.example.jobsearch.util.DateFormatter
 
 /**
@@ -243,7 +245,8 @@ fun JobDetailScreen(
                     job = job,
                     matchResult = state.matchResult,
                     onShowMatch = { viewModel.showMatchAnalysis(true) },
-                    onViewDescription = { viewModel.showJobDescription(true) }
+                    onViewDescription = { viewModel.showJobDescription(true) },
+                    onShowCompanyInfo = { viewModel.showCompanyInfo(true) }
                 )
 
                 if (job.tags.isNotBlank()) {
@@ -439,6 +442,31 @@ fun JobDetailScreen(
         JobDescriptionDialog(
             description = job.description,
             onDismiss = { viewModel.showJobDescription(false) }
+        )
+    }
+
+    if (state.showCompanyInfoDialog && job != null) {
+        CompanyInfoDialog(
+            companyName = job.company,
+            companyInfo = job.companyInfo,
+            onDismiss = { viewModel.showCompanyInfo(false) }
+        )
+    }
+
+    if (state.showCheatSheetOptionsDialog) {
+        CheatSheetOptionsDialog(
+            onGenerate = { overview, challenges, dayToDay, highlights, customQ, strengths, weaknesses ->
+                viewModel.generateCheatSheet(
+                    includeOverview = overview,
+                    includeChallenges = challenges,
+                    includeDayToDay = dayToDay,
+                    includeHighlights = highlights,
+                    customQuestions = customQ,
+                    strengths = strengths,
+                    weaknesses = weaknesses
+                )
+            },
+            onDismiss = { viewModel.showCheatSheetOptions(false) }
         )
     }
 
@@ -671,7 +699,8 @@ private fun JobHeader(
     job: Job,
     matchResult: JobDetailViewModel.MatchResult?,
     onShowMatch: () -> Unit,
-    onViewDescription: () -> Unit
+    onViewDescription: () -> Unit,
+    onShowCompanyInfo: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(
@@ -697,7 +726,12 @@ private fun JobHeader(
             }
         }
         if (job.company.isNotBlank()) {
-            Text(job.company, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.secondary)
+            Text(
+                job.company, 
+                style = MaterialTheme.typography.titleMedium, 
+                color = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.clickable { onShowCompanyInfo() }
+            )
         }
         Row(
             verticalAlignment = Alignment.CenterVertically,

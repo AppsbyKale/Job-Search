@@ -14,9 +14,11 @@ import com.example.jobsearch.data.JobDatabase
 import com.example.jobsearch.data.JobRepository
 import com.example.jobsearch.data.SettingsRepository
 import com.example.jobsearch.data.SyncRepository
+import com.example.jobsearch.data.SystemLogRepository
 import com.example.jobsearch.data.TrainingExampleDao
 import com.example.jobsearch.data.TrainingRepository
 import com.example.jobsearch.document.DocumentExporter
+import com.example.jobsearch.network.LangSearchClient
 import com.example.jobsearch.parsing.HtmlRenderer
 import com.example.jobsearch.parsing.JobParser
 import com.example.jobsearch.resume.ResumeImporter
@@ -128,7 +130,8 @@ object AppModule {
         interviewRepository: InterviewRepository,
         settingsRepository: SettingsRepository,
         trainingRepository: TrainingRepository,
-        systemLog: com.example.jobsearch.data.SystemLogRepository
+        systemLog: SystemLogRepository,
+        langSearchClient: LangSearchClient
     ): GenerationRepository {
         return GenerationRepository(
             scope = scope,
@@ -138,7 +141,8 @@ object AppModule {
             interviewRepository = interviewRepository,
             settings = settingsRepository,
             trainingRepository = trainingRepository,
-            systemLog = systemLog
+            systemLog = systemLog,
+            langSearchClient = langSearchClient
         )
     }
 

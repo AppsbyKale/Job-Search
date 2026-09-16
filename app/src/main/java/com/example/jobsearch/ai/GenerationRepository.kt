@@ -6,7 +6,9 @@ import com.example.jobsearch.data.InterviewRepository
 import com.example.jobsearch.data.JobRepository
 import com.example.jobsearch.data.ResumeData
 import com.example.jobsearch.data.SettingsRepository
+import com.example.jobsearch.data.SystemLogRepository
 import com.example.jobsearch.data.TrainingRepository
+import com.example.jobsearch.network.LangSearchClient
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -34,7 +36,8 @@ class GenerationRepository(
     private val interviewRepository: InterviewRepository,
     private val settings: SettingsRepository,
     private val trainingRepository: TrainingRepository,
-    private val systemLog: com.example.jobsearch.data.SystemLogRepository
+    private val systemLog: SystemLogRepository,
+    private val langSearchClient: LangSearchClient
 ) {
     enum class Type(val label: String) {
         RESUME("Tailoring resume..."),
@@ -314,7 +317,16 @@ class GenerationRepository(
         startCrawl(progress + 0.15f)
     }
 
-    fun generateCheatSheet(jobId: Long) {
+    fun generateCheatSheet(
+        jobId: Long,
+        includeOverview: Boolean = true,
+        includeChallenges: Boolean = true,
+        includeDayToDay: Boolean = true,
+        includeHighlights: Boolean = true,
+        customQuestions: String = "",
+        strengths: String = "",
+        weaknesses: String = ""
+    ) {
         if (_state.value.running) return
         if (!modelManager.isModelDownloaded()) {
             _state.value = State(jobId = jobId, error = "Local AI model not downloaded. Visit Settings.")
@@ -326,10 +338,33 @@ class GenerationRepository(
             try {
                 val job = repository.getJob(jobId) ?: throw IllegalStateException("Job not found.")
                 val resume = settings.resumeText.first()
-                
-                updateProgress("Analyzing for cheat sheet...", 0.3f)
-                val prompt = PromptBuilder.cheatSheetPrompt(job, resume)
-                Log.d(TAG, "Sending cheat sheet prompt to Local AI...")
+
+                // Fetch company info via LangSearch if missing
+                var companyInfo = job.companyInfo
+                if (companyInfo.isBlank() && job.company.isNotBlank()) {
+                    updateProgress("Searching company background...", 0.1f)
+                    val searchResult = langSearchClient.searchCompany(job.company, "")
+                    if (searchResult.isNotBlank()) {
+                        val synthPrompt = "Summarize the company background, culture, mission, and industry for '${job.company}' based on these search results:\n$searchResult\n\nKeep it concise (2-3 paragraphs)."
+                        companyInfo = modelManager.generate(synthPrompt, source = "Company Search").trim()
+                        repository.updateJob(job.copy(companyInfo = companyInfo))
+                    }
+                }
+
+                updateProgress("Analyzing for cheat sheet...", 0.4f)
+                val prompt = PromptBuilder.cheatSheetPrompt(
+                    job = job,
+                    resumeText = resume,
+                    companyInfo = companyInfo,
+                    includeOverview = includeOverview,
+                    includeChallenges = includeChallenges,
+                    includeDayToDay = includeDayToDay,
+                    includeHighlights = includeHighlights,
+                    customQuestions = customQuestions,
+                    strengths = strengths,
+                    weaknesses = weaknesses
+                )
+                Log.d(TAG, "Sending cheat sheet prompt...")
                 val result = withTimeout(180.seconds) {
                     modelManager.generate(prompt, source = "Cheat Sheet").trim()
                 }
