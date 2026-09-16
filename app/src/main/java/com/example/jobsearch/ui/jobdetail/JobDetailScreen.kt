@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.jobsearch.R
+import com.example.jobsearch.ai.GenerationRepository
 import com.example.jobsearch.data.Job
 import com.example.jobsearch.data.JobStatus
 import com.example.jobsearch.data.getDisplayPreview
@@ -60,21 +61,6 @@ fun JobDetailScreen(
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
-
-    var pendingPdfText by remember { mutableStateOf<String?>(null) }
-    var pendingPdfType by remember { mutableStateOf<String?>(null) }
-
-    val pdfLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/pdf")
-    ) { uri ->
-        if ((uri != null) && (pendingPdfText != null)) {
-            val isCheat = pendingPdfType == "cheat"
-            val ok = viewModel.exportPdf(uri, pendingPdfText!!, isCheat)
-            Toast.makeText(context, if (ok) "Saved to file" else "Save failed", Toast.LENGTH_SHORT).show()
-        }
-        pendingPdfText = null
-        pendingPdfType = null
-    }
 
     LaunchedEffect(generate) {
         viewModel.onGenerateFromArgs(generate)
@@ -185,7 +171,11 @@ fun JobDetailScreen(
                             text = { Text(stringResource(R.string.interview_cheat_sheet_label)) },
                             onClick = {
                                 menuExpanded = false
-                                viewModel.showCheatSheet(true)
+                                if (job?.hasCheatSheet == true) {
+                                    onViewDocument(job.id, "cheat", false)
+                                } else {
+                                    viewModel.generateCheatSheet()
+                                }
                             }
                         )
                         DropdownMenuItem(
@@ -296,9 +286,8 @@ fun JobDetailScreen(
                     )
                 }
 
-                val isCheat = state.generationType == com.example.jobsearch.ai.GenerationRepository.Type.CHEAT_SHEET
-                val isFollow = state.generationType == com.example.jobsearch.ai.GenerationRepository.Type.FOLLOW_UP
-                if (state.generating != null && !isCheat && !isFollow) {
+                val isFollow = state.generationType == GenerationRepository.Type.FOLLOW_UP
+                if (state.generating != null && !isFollow) {
                     GenerationProgress(state, viewModel)
                 }
                 
@@ -414,22 +403,7 @@ fun JobDetailScreen(
         )
     }
 
-    if (state.showCheatSheetDialog) {
-        CheatSheetDialog(
-            job = job,
-            running = state.generationType == com.example.jobsearch.ai.GenerationRepository.Type.CHEAT_SHEET,
-            progress = state.generationProgress,
-            progressText = state.generationProgressText,
-            onGenerate = viewModel::generateCheatSheet,
-            onCopy = { text -> scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(null, text))) } },
-            onExportPdf = { text ->
-                pendingPdfText = text
-                pendingPdfType = "cheat"
-                pdfLauncher.launch("CheatSheet_${job?.company ?: "Job"}.pdf")
-            },
-            onDismiss = { viewModel.showCheatSheet(false) }
-        )
-    }
+
 
     if (state.showFollowUpDialog) {
         FollowUpDialog(
