@@ -316,7 +316,7 @@ class DocumentViewModel @Inject constructor(
     }
 
     private fun parseCheatSheetFromText(text: String): CheatSheetData {
-        val lines = text.lineSequence().map { it.trim() }.toList()
+        val lines = text.lineSequence().toList()
         val highlights = mutableListOf<String>()
         val toughQuestions = mutableListOf<ToughQuestion>()
         
@@ -325,49 +325,67 @@ class DocumentViewModel @Inject constructor(
         var currentS = ""
         var collectingAnswer = false
         var currentAnswer = StringBuilder()
+        var consecutiveEmptyLines = 0
+
+        fun commitQuestion() {
+            if (currentQ.isNotBlank() || currentS.isNotBlank() || currentAnswer.isNotBlank()) {
+                toughQuestions.add(ToughQuestion(currentQ.trim(), currentS.trim(), currentAnswer.toString().trim()))
+                currentQ = ""
+                currentS = ""
+                currentAnswer = StringBuilder()
+                collectingAnswer = false
+            }
+        }
         
-        for (line in lines) {
+        for (rawLine in lines) {
+            val line = rawLine.trim()
             if (line.isEmpty()) {
-                if (collectingAnswer) currentAnswer.append("\n")
+                consecutiveEmptyLines++
+                if (consecutiveEmptyLines >= 2) {
+                    commitQuestion()
+                } else if (collectingAnswer) {
+                    currentAnswer.append("\n")
+                }
                 continue
             }
+            consecutiveEmptyLines = 0
+
             if (line.contains("KEY HIGHLIGHTS", ignoreCase = true)) {
+                commitQuestion()
                 section = 1
-                collectingAnswer = false
                 continue
             }
             if (line.contains("TOUGH QUESTIONS", ignoreCase = true)) {
+                commitQuestion()
                 section = 2
-                collectingAnswer = false
                 continue
             }
             
             if (section == 1) {
                 highlights.add(line.removePrefix("•").trim())
             } else if (section == 2) {
-                if (line.startsWith("Q:", ignoreCase = true)) {
-                    if (currentQ.isNotEmpty()) {
-                        toughQuestions.add(ToughQuestion(currentQ, currentS, currentAnswer.toString().trim()))
-                    }
-                    currentQ = line.removePrefix("Q:").trim()
-                    currentS = ""
-                    currentAnswer = StringBuilder()
+                if (line.startsWith("Q:", ignoreCase = true) || line.startsWith("Question:", ignoreCase = true)) {
+                    commitQuestion()
+                    currentQ = line.substringAfter(":").trim()
+                } else if (line.startsWith("STRATEGY:", ignoreCase = true) || line.startsWith("Strategy:", ignoreCase = true)) {
+                    currentS = line.substringAfter(":").trim()
                     collectingAnswer = false
-                } else if (line.startsWith("STRATEGY:", ignoreCase = true)) {
-                    currentS = line.removePrefix("STRATEGY:").trim()
-                    collectingAnswer = false
-                } else if (line.startsWith("EXAMPLE ANSWER:", ignoreCase = true)) {
-                    val ex = line.removePrefix("EXAMPLE ANSWER:").trim()
+                } else if (line.startsWith("EXAMPLE ANSWER:", ignoreCase = true) || line.startsWith("Example Answer:", ignoreCase = true)) {
+                    val ex = line.substringAfter(":").trim()
                     currentAnswer.append(ex)
                     collectingAnswer = true
                 } else if (collectingAnswer) {
-                    currentAnswer.append(line).append("\n")
+                    currentAnswer.append("\n").append(line)
+                } else if (currentQ.isBlank()) {
+                    currentQ = line
+                } else if (currentS.isBlank()) {
+                    currentS = line
+                } else {
+                    currentAnswer.append("\n").append(line)
                 }
             }
         }
-        if (currentQ.isNotEmpty()) {
-            toughQuestions.add(ToughQuestion(currentQ, currentS, currentAnswer.toString().trim()))
-        }
+        commitQuestion()
         return CheatSheetData(highlights, toughQuestions)
     }
 
