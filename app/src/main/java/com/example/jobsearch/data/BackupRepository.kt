@@ -5,17 +5,12 @@ import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
-import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.util.zip.ZipEntry
-import java.util.zip.ZipInputStream
-import java.util.zip.ZipOutputStream
 
 /**
- * Handles full portable backups of the application data, including the Room database
- * and DataStore settings. Backups are stored as ZIP files with a .jsbackup extension.
+ * Handles full portable backups of the application data, including jobs, interview data,
+ * and settings. Backups are stored as clean JSON files with a .jsbackup extension.
  */
 class BackupRepository(
     private val context: Context,
@@ -24,114 +19,115 @@ class BackupRepository(
     private val systemLog: SystemLogRepository
 ) {
     /**
-     * Exports all data to a ZIP file at the given URI.
+     * Exports all data to a JSON file at the given URI.
      */
     suspend fun exportBackup(uri: Uri) = withContext(Dispatchers.IO) {
         systemLog.log("Starting backup export...")
-        // 1. Ensure DB is flushed to disk
-        try {
-            database.query("PRAGMA wal_checkpoint(FULL)", null).use { it.moveToFirst() }
-        } catch (e: Exception) {
-            systemLog.log("Warning: WAL checkpoint failed, backup might be slightly stale: ${e.message}")
-        }
+        val jobs = database.jobDao().observeAll().first()
 
-        val dbFile = context.getDatabasePath("jobsearch.db")
-        if (!dbFile.exists()) {
-            systemLog.log("ERROR: Database file not found at ${dbFile.path}")
-            throw IllegalStateException("Database file not found.")
-        }
-
-        // 2. Gather settings
         val settings = JSONObject().apply {
             put("resume_text", settingsRepository.resumeText.first())
             put("resume_file_name", settingsRepository.resumeFileName.first())
             put("model_url", settingsRepository.modelUrl.first())
             put("gemini_api_key", settingsRepository.geminiApiKey.first())
+            put("lang_search_api_key", settingsRepository.langSearchApiKey.first())
         }
 
-        // 3. Create ZIP
-        context.contentResolver.openOutputStream(uri)?.use { output ->
-            ZipOutputStream(output).use { zos ->
-                // Add Database
-                zos.putNextEntry(ZipEntry("jobsearch.db"))
-                FileInputStream(dbFile).use { it.copyTo(zos) }
-                zos.closeEntry()
+        val root = JSONObject().apply {
+            put("version", 10)
+            put("settings", settings)
+            put("jobs", JSONArray().apply {
+                jobs.forEach { job ->
+                    put(JSONObject().apply {
+                        put("id", job.id)
+                        put("title", job.title)
+                        put("company", job.company)
+                        put("url", job.url)
+                        put("description", job.description)
+                        put("dateAdded", job.dateAdded)
+                        put("dateApplied", if (job.dateApplied != null) job.dateApplied else JSONObject.NULL)
+                        put("status", job.status)
+                        put("resumeText", job.resumeText)
+                        put("coverLetterText", job.coverLetterText)
+                        put("initialEmailText", job.initialEmailText)
+                        put("cheatSheetText", job.cheatSheetText)
+                        put("followUpEmailText", job.followUpEmailText)
+                        put("notes", job.notes)
+                        put("externalResumeText", job.externalResumeText)
+                        put("externalCoverLetterText", job.externalCoverLetterText)
+                        put("tags", job.tags)
+                        put("companyInfo", job.companyInfo)
+                        put("cheatSheetCustomQuestions", job.cheatSheetCustomQuestions)
+                    })
+                }
+            })
+        }
 
-                // Add Settings
-                zos.putNextEntry(ZipEntry("settings.json"))
-                zos.write(settings.toString().toByteArray(Charsets.UTF_8))
-                zos.closeEntry()
-            }
-            systemLog.log("Backup exported successfully to ${uri.path}")
+        context.contentResolver.openOutputStream(uri)?.use { output ->
+            output.write(root.toString(2).toByteArray(Charsets.UTF_8))
+            systemLog.log("Backup exported successfully.")
         } ?: throw IllegalStateException("Could not open output stream for backup.")
     }
 
     /**
-     * Imports data from a ZIP file at the given URI.
-     * Replaces the current database and updates settings.
+     * Imports data from a JSON file at the given URI.
+     * Upserts jobs and updates settings without triggering Room schema version mismatches.
      */
     suspend fun importBackup(uri: Uri) = withContext(Dispatchers.IO) {
         systemLog.log("Starting backup restore from ${uri.path}...")
-        var dbRestored = false
-        var settingsRestored = false
         
         context.contentResolver.openInputStream(uri)?.use { input ->
-            ZipInputStream(input).use { zis ->
-                var entry = zis.nextEntry
-                while (entry != null) {
-                    systemLog.log("Found zip entry: ${entry.name}")
-                    when (entry.name) {
-                        "jobsearch.db" -> {
-                            systemLog.log("Restoring database file...")
-                            val dbFile = context.getDatabasePath("jobsearch.db")
-                            
-                            try {
-                                database.close()
-                                systemLog.log("Database connection closed.")
-                            } catch (e: Exception) {
-                                systemLog.log("Notice: Error closing DB: ${e.message}")
-                            }
-                            
-                            // Delete WAL/SHM files
-                            File(dbFile.path + "-wal").delete()
-                            File(dbFile.path + "-shm").delete()
-                            systemLog.log("WAL/SHM files cleared.")
-                            
-                            FileOutputStream(dbFile).use { fos ->
-                                zis.copyTo(fos)
-                            }
-                            dbRestored = true
-                            systemLog.log("Database file overwritten.")
-                        }
-                        "settings.json" -> {
-                            systemLog.log("Restoring settings...")
-                            try {
-                                val json = zis.bufferedReader().readText()
-                                val obj = JSONObject(json)
-                                settingsRepository.setResumeText(obj.optString("resume_text"))
-                                settingsRepository.setResumeFileName(obj.optString("resume_file_name"))
-                                settingsRepository.setModelUrl(obj.optString("model_url"))
-                                settingsRepository.setGeminiApiKey(obj.optString("gemini_api_key"))
-                                settingsRestored = true
-                                systemLog.log("Settings updated.")
-                            } catch (e: Exception) {
-                                systemLog.log("ERROR: Failed to parse settings.json: ${e.message}")
-                            }
-                        }
-                    }
-                    zis.closeEntry()
-                    entry = zis.nextEntry
-                }
+            val jsonStr = input.bufferedReader().readText()
+            val root = JSONObject(jsonStr)
+
+            // 1. Restore settings
+            val settingsObj = root.optJSONObject("settings")
+            if (settingsObj != null) {
+                settingsRepository.setResumeText(settingsObj.optString("resume_text"))
+                settingsRepository.setResumeFileName(settingsObj.optString("resume_file_name"))
+                settingsRepository.setModelUrl(settingsObj.optString("model_url"))
+                settingsRepository.setGeminiApiKey(settingsObj.optString("gemini_api_key"))
+                settingsRepository.setLangSearchApiKey(settingsObj.optString("lang_search_api_key"))
+                systemLog.log("Settings restored.")
             }
+
+            // 2. Restore jobs
+            val jobsArray = root.optJSONArray("jobs")
+            if (jobsArray != null) {
+                for (i in 0 until jobsArray.length()) {
+                    val jObj = jobsArray.getJSONObject(i)
+                    val job = Job(
+                        id = jObj.optLong("id", 0L),
+                        title = jObj.optString("title"),
+                        company = jObj.optString("company"),
+                        url = jObj.optString("url"),
+                        description = jObj.optString("description"),
+                        dateAdded = jObj.optLong("dateAdded", System.currentTimeMillis()),
+                        dateApplied = if (jObj.has("dateApplied") && !jObj.isNull("dateApplied")) jObj.optLong("dateApplied") else null,
+                        status = jObj.optString("status", JobStatus.SAVED.name),
+                        resumeText = jObj.optString("resumeText"),
+                        coverLetterText = jObj.optString("coverLetterText"),
+                        initialEmailText = jObj.optString("initialEmailText"),
+                        cheatSheetText = jObj.optString("cheatSheetText"),
+                        followUpEmailText = jObj.optString("followUpEmailText"),
+                        notes = jObj.optString("notes"),
+                        externalResumeText = jObj.optString("externalResumeText"),
+                        externalCoverLetterText = jObj.optString("externalCoverLetterText"),
+                        tags = jObj.optString("tags"),
+                        companyInfo = jObj.optString("companyInfo"),
+                        cheatSheetCustomQuestions = jObj.optString("cheatSheetCustomQuestions")
+                    )
+                    val existing = database.jobDao().getById(job.id)
+                    if (existing == null) {
+                        database.jobDao().insert(job)
+                    } else {
+                        database.jobDao().update(job)
+                    }
+                }
+                systemLog.log("Jobs restored successfully (${jobsArray.length()} jobs).")
+            }
+
+            systemLog.log("RESTORE COMPLETE.")
         } ?: throw IllegalStateException("Could not open input stream for restore.")
-        
-        if (!dbRestored) systemLog.log("WARNING: No 'jobsearch.db' found in the backup file.")
-        if (!settingsRestored) systemLog.log("WARNING: No 'settings.json' found in the backup file.")
-        
-        if (dbRestored || settingsRestored) {
-            systemLog.log("RESTORE COMPLETE. Please RESTART THE APP NOW.")
-        } else {
-            systemLog.log("RESTORE FAILED: No valid data found in ZIP.")
-        }
     }
 }
