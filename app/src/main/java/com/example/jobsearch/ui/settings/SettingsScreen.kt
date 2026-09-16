@@ -33,6 +33,8 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -69,7 +71,11 @@ import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -402,6 +408,20 @@ fun SettingsScreen(
     }
 }
 
+class FirstFourMaskVisualTransformation(private val visible: Boolean) : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        if (visible || text.length <= 4) {
+            return TransformedText(text, OffsetMapping.Identity)
+        }
+        val masked = text.text.take(4) + "*".repeat(text.length - 4)
+        val offsetMapping = object : OffsetMapping {
+            override fun originalToTransformed(offset: Int): Int = offset
+            override fun transformedToOriginal(offset: Int): Int = offset
+        }
+        return TransformedText(androidx.compose.ui.text.AnnotatedString(masked), offsetMapping)
+    }
+}
+
 @Composable
 private fun CloudAiSection(
     state: SettingsViewModel.UiState,
@@ -411,6 +431,9 @@ private fun CloudAiSection(
     onLangSearchKeyChange: (String) -> Unit,
     onSaveLangSearchKey: () -> Unit
 ) {
+    var geminiVisible by remember { mutableStateOf(false) }
+    var langVisible by remember { mutableStateOf(false) }
+
     AppCard(modifier = Modifier.fillMaxWidth()) {
         SectionHeader(stringResource(R.string.cloud_ai_section_title))
         Text(
@@ -439,6 +462,15 @@ private fun CloudAiSection(
                 onValueChange = onApiKeyChange,
                 label = { Text(stringResource(R.string.gemini_api_key_label)) },
                 singleLine = true,
+                visualTransformation = FirstFourMaskVisualTransformation(geminiVisible),
+                trailingIcon = {
+                    IconButton(onClick = { geminiVisible = !geminiVisible }) {
+                        Icon(
+                            imageVector = if (geminiVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            contentDescription = if (geminiVisible) "Hide API Key" else "Show API Key"
+                        )
+                    }
+                },
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(8.dp))
@@ -454,6 +486,15 @@ private fun CloudAiSection(
                 onValueChange = onLangSearchKeyChange,
                 label = { Text("LangSearch API Key") },
                 singleLine = true,
+                visualTransformation = FirstFourMaskVisualTransformation(langVisible),
+                trailingIcon = {
+                    IconButton(onClick = { langVisible = !langVisible }) {
+                        Icon(
+                            imageVector = if (langVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            contentDescription = if (langVisible) "Hide API Key" else "Show API Key"
+                        )
+                    }
+                },
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(8.dp))
