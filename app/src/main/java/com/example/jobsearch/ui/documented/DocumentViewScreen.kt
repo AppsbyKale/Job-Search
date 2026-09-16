@@ -52,6 +52,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -233,24 +234,39 @@ private fun PreviewPane(
         }
 
         if (preview is PreviewState.Ready) {
-            Row(
+            val context = LocalContext.current
+            Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.surface)
                     .navigationBarsPadding()
                     .padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                OutlinedButton(
-                    onClick = viewModel::share,
-                    modifier = Modifier.weight(1f)
-                ) { Text(stringResource(R.string.share_button)) }
-                OutlinedButton(
-                    onClick = { pdfLauncher.launch(viewModel.pdfFileName()) },
-                    modifier = Modifier.weight(1f)
-                ) { Text(stringResource(R.string.save_to_file_button)) }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedButton(
+                        onClick = viewModel::share,
+                        modifier = Modifier.weight(1f)
+                    ) { Text(stringResource(R.string.share_button)) }
+                    OutlinedButton(
+                        onClick = { pdfLauncher.launch(viewModel.pdfFileName()) },
+                        modifier = Modifier.weight(1f)
+                    ) { Text(stringResource(R.string.save_to_file_button)) }
+                }
+                TextButton(
+                    onClick = {
+                        viewModel.regenerateDocument()
+                        Toast.makeText(context, "Regenerating document...", Toast.LENGTH_SHORT).show()
+                    }
+                ) {
+                    Text("Regenerate")
+                }
             }
         }
     }

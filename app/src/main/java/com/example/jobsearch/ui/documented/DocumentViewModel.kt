@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.jobsearch.ai.GenerationRepository
 import com.example.jobsearch.data.CheatSheetData
 import com.example.jobsearch.data.CoverLetterData
 import com.example.jobsearch.data.JobRepository
@@ -29,6 +30,7 @@ import javax.inject.Inject
 class DocumentViewModel @Inject constructor(
     private val repository: JobRepository,
     private val exporter: DocumentExporter,
+    private val generationRepository: GenerationRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -394,6 +396,18 @@ class DocumentViewModel @Inject constructor(
             return t
         }
         return FALLBACK_NAME
+    }
+
+    fun regenerateDocument() {
+        viewModelScope.launch {
+            when (type) {
+                "cheat" -> generationRepository.generateCheatSheet(jobId)
+                "resume", "external_resume" -> generationRepository.generate(jobId, GenerationRepository.Type.RESUME)
+                "cover", "external_cover" -> generationRepository.generate(jobId, GenerationRepository.Type.COVER)
+                "followup" -> generationRepository.generate(jobId, GenerationRepository.Type.FOLLOW_UP)
+                "initial" -> generationRepository.generate(jobId, GenerationRepository.Type.INITIAL_EMAIL)
+            }
+        }
     }
 
     private fun sanitizeFileNamePart(value: String): String =

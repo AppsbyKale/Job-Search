@@ -119,15 +119,12 @@ data class CheatSheetData(
                     }
                 }
                 CheatSheetData(highlights, questions)
-            }.onFailure {
-                Log.e("CheatSheetData", "Failed to parse JSON", it)
             }.getOrNull()
 
             if (parsed != null && parsed.isSubstantial()) {
                 return parsed
             }
 
-            // Fallback to text parser if JSON parsing failed or yielded empty lists
             return fromText(jsonStr)
         }
 
@@ -137,7 +134,6 @@ data class CheatSheetData(
             val highlights = mutableListOf<String>()
             val questions = mutableListOf<ToughQuestion>()
 
-            var currentMode = "" // "highlights" or "questions"
             var currentQ = ""
             var currentS = ""
             var currentA = StringBuilder()
@@ -151,41 +147,47 @@ data class CheatSheetData(
                 }
             }
 
-            val lines = text.replace("\r\n", "\n").replace('\r', '\n').split("\n")
+            val cleanedText = text
+                .replace("{\n", "\n")
+                .replace("}\n", "\n")
+                .replace("\",\n", "\n")
+                .replace("\",", "\n")
+                .replace("[\n", "\n")
+                .replace("]\n", "\n")
+                .replace("\"keyHighlights\": [", "KEY HIGHLIGHTS:")
+                .replace("\"toughQuestions\": [", "TOUGH QUESTIONS:")
+                .replace("\"question\":", "Q:")
+                .replace("\"strategy\":", "STRATEGY:")
+                .replace("\"exampleAnswer\":", "EXAMPLE ANSWER:")
+                .replace("\"example_answer\":", "EXAMPLE ANSWER:")
+                .replace("\"", "")
+
+            val lines = cleanedText.replace("\r\n", "\n").replace('\r', '\n').split("\n")
             for (rawLine in lines) {
                 val line = rawLine.trim()
                 val lower = line.lowercase()
 
                 if (lower.contains("key highlight") || lower.contains("highlights") || lower.contains("selling point")) {
                     commitQuestion()
-                    currentMode = "highlights"
                     continue
-                } else if (lower.contains("tough question") || lower.contains("questions &") || lower.contains("interview cheat sheet")) {
+                } else if (lower.contains("tough question") || lower.contains("toughquestions") || lower.contains("questions")) {
                     commitQuestion()
-                    currentMode = "questions"
                     continue
                 }
 
-                if (currentMode == "highlights") {
+                if (line.startsWith("Q:") || line.startsWith("Question:") || line.startsWith("q:")) {
+                    commitQuestion()
+                    currentQ = line.substringAfter(":").trim()
+                } else if (line.startsWith("STRATEGY:") || line.startsWith("Strategy:") || line.startsWith("strategy:")) {
+                    currentS = line.substringAfter(":").trim()
+                } else if (line.startsWith("EXAMPLE ANSWER:") || line.startsWith("Example Answer:") || line.startsWith("exampleAnswer:")) {
+                    val remaining = line.substringAfter(":").trim()
+                    if (remaining.isNotBlank()) currentA.append(remaining).append("\n")
+                } else if (currentQ.isNotBlank()) {
+                    currentA.append(line).append("\n")
+                } else if (line.isNotBlank() && !line.startsWith("{") && !line.startsWith("}") && !line.startsWith("[") && !line.startsWith("]")) {
                     val clean = line.removePrefix("•").removePrefix("-").removePrefix("*").trim()
-                    if (clean.isNotBlank()) {
-                        highlights.add(clean)
-                    }
-                } else {
-                    if (line.startsWith("Q:") || line.startsWith("Question:")) {
-                        commitQuestion()
-                        currentQ = line.substringAfter(":").trim()
-                    } else if (line.startsWith("STRATEGY:") || line.startsWith("Strategy:")) {
-                        currentS = line.substringAfter(":").trim()
-                    } else if (line.startsWith("EXAMPLE ANSWER:") || line.startsWith("Example Answer:")) {
-                        val remaining = line.substringAfter(":").trim()
-                        if (remaining.isNotBlank()) currentA.append(remaining).append("\n")
-                    } else if (currentQ.isNotBlank()) {
-                        currentA.append(line).append("\n")
-                    } else if (line.isNotBlank()) {
-                        val clean = line.removePrefix("•").removePrefix("-").removePrefix("*").trim()
-                        if (clean.isNotBlank()) highlights.add(clean)
-                    }
+                    if (clean.isNotBlank()) highlights.add(clean)
                 }
             }
             commitQuestion()
