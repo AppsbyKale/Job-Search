@@ -29,8 +29,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -234,7 +237,7 @@ private fun PreviewPane(
         }
 
         if (preview is PreviewState.Ready) {
-            val context = LocalContext.current
+            val genState by viewModel.generationState.collectAsStateWithLifecycle()
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -259,13 +262,23 @@ private fun PreviewPane(
                         modifier = Modifier.weight(1f)
                     ) { Text(stringResource(R.string.save_to_file_button)) }
                 }
-                TextButton(
-                    onClick = {
-                        viewModel.regenerateDocument()
-                        Toast.makeText(context, "Regenerating document...", Toast.LENGTH_SHORT).show()
-                    }
+
+                OutlinedButton(
+                    onClick = { viewModel.regenerateDocument() },
+                    enabled = !genState.running,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Regenerate")
+                    Text(if (genState.running) "Generating..." else "Regenerate")
+                }
+
+                if (genState.running) {
+                    Spacer(Modifier.height(4.dp))
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    Text(
+                        text = genState.progressText ?: "Generating document...",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }

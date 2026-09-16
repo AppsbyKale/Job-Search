@@ -51,45 +51,48 @@ class DocumentViewModel @Inject constructor(
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
+    val generationState: StateFlow<GenerationRepository.State> = generationRepository.state
+
     init {
         viewModelScope.launch {
-            val job = repository.getJob(jobId)
-            val rawText = when (type) {
-                "resume" -> job?.resumeText
-                "cheat" -> job?.cheatSheetText
-                "followup" -> job?.followUpEmailText
-                "initial" -> job?.initialEmailText
-                "external_resume" -> job?.externalResumeText
-                "external_cover" -> job?.externalCoverLetterText
-                else -> job?.coverLetterText
-            }
-            
-            val displayLines = if (rawText != null) {
-                when (type) {
-                    "resume", "external_resume" -> ResumeData.fromJson(rawText)?.toHumanReadableText() ?: rawText
-                    "cheat" -> {
-                        CheatSheetData.fromJson(rawText)?.toHumanReadableText() ?: rawText
+            repository.observeJob(jobId).collect { job ->
+                if (job != null) {
+                    val rawText = when (type) {
+                        "resume" -> job.resumeText
+                        "cheat" -> job.cheatSheetText
+                        "followup" -> job.followUpEmailText
+                        "initial" -> job.initialEmailText
+                        "external_resume" -> job.externalResumeText
+                        "external_cover" -> job.externalCoverLetterText
+                        else -> job.coverLetterText
                     }
-                    "followup", "initial" -> rawText
-                    else -> CoverLetterData.fromJson(rawText)?.toHumanReadableText() ?: rawText
+                    
+                    val displayLines = if (rawText != null) {
+                        when (type) {
+                            "resume", "external_resume" -> ResumeData.fromJson(rawText)?.toHumanReadableText() ?: rawText
+                            "cheat" -> CheatSheetData.fromJson(rawText)?.toHumanReadableText() ?: rawText
+                            "followup", "initial" -> rawText
+                            else -> CoverLetterData.fromJson(rawText)?.toHumanReadableText() ?: rawText
+                        }
+                    } else {
+                        null
+                    }
+
+                    val resumeData = if ((type == "resume" || type == "external_resume") && rawText != null) {
+                        ResumeData.fromJson(rawText) ?: ResumeData.fromText(rawText)
+                    } else null
+
+                    _state.update {
+                        it.copy(
+                            text = displayLines.orEmpty(),
+                            original = displayLines.orEmpty(),
+                            loaded = true,
+                            jobTitle = job.title,
+                            company = job.company,
+                            resumeData = resumeData
+                        )
+                    }
                 }
-            } else {
-                null
-            }
-
-            val resumeData = if ((type == "resume" || type == "external_resume") && rawText != null) {
-                ResumeData.fromJson(rawText) ?: ResumeData.fromText(rawText)
-            } else null
-
-            _state.update {
-                it.copy(
-                    text = displayLines.orEmpty(),
-                    original = displayLines.orEmpty(),
-                    loaded = true,
-                    jobTitle = job?.title.orEmpty(),
-                    company = job?.company.orEmpty(),
-                    resumeData = resumeData
-                )
             }
         }
     }
