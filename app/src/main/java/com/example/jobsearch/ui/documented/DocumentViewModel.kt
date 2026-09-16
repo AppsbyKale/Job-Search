@@ -45,11 +45,15 @@ class DocumentViewModel @Inject constructor(
         val loaded: Boolean = false,
         val jobTitle: String = "",
         val company: String = "",
-        val resumeData: ResumeData? = null
+        val resumeData: ResumeData? = null,
+        val showCheatSheetOptionsDialog: Boolean = false
     )
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
+
+    private val _showCheatSheetOptionsDialog = MutableStateFlow(false)
+    val showCheatSheetOptionsDialog: StateFlow<Boolean> = _showCheatSheetOptionsDialog.asStateFlow()
 
     val generationState: StateFlow<GenerationRepository.State> = generationRepository.state
 
@@ -93,6 +97,11 @@ class DocumentViewModel @Inject constructor(
                         )
                     }
                 }
+            }
+        }
+        viewModelScope.launch {
+            _showCheatSheetOptionsDialog.collect { show ->
+                _state.update { it.copy(showCheatSheetOptionsDialog = show) }
             }
         }
     }
@@ -401,14 +410,45 @@ class DocumentViewModel @Inject constructor(
         return FALLBACK_NAME
     }
 
-    fun regenerateDocument() {
+    fun showCheatSheetOptions(show: Boolean) {
+        _showCheatSheetOptionsDialog.value = show
+    }
+
+    fun generateCheatSheetWithOptions(
+        includeOverview: Boolean,
+        includeChallenges: Boolean,
+        includeDayToDay: Boolean,
+        includeHighlights: Boolean,
+        customQuestions: String,
+        strengths: String,
+        weaknesses: String
+    ) {
+        _showCheatSheetOptionsDialog.value = false
         viewModelScope.launch {
-            when (type) {
-                "cheat" -> generationRepository.generateCheatSheet(jobId)
-                "resume", "external_resume" -> generationRepository.generate(jobId, GenerationRepository.Type.RESUME)
-                "cover", "external_cover" -> generationRepository.generate(jobId, GenerationRepository.Type.COVER)
-                "followup" -> generationRepository.generate(jobId, GenerationRepository.Type.FOLLOW_UP)
-                "initial" -> generationRepository.generate(jobId, GenerationRepository.Type.INITIAL_EMAIL)
+            generationRepository.generateCheatSheet(
+                jobId = jobId,
+                includeOverview = includeOverview,
+                includeChallenges = includeChallenges,
+                includeDayToDay = includeDayToDay,
+                includeHighlights = includeHighlights,
+                customQuestions = customQuestions,
+                strengths = strengths,
+                weaknesses = weaknesses
+            )
+        }
+    }
+
+    fun regenerateDocument() {
+        if (type == "cheat") {
+            _showCheatSheetOptionsDialog.value = true
+        } else {
+            viewModelScope.launch {
+                when (type) {
+                    "resume", "external_resume" -> generationRepository.generate(jobId, GenerationRepository.Type.RESUME)
+                    "cover", "external_cover" -> generationRepository.generate(jobId, GenerationRepository.Type.COVER)
+                    "followup" -> generationRepository.generate(jobId, GenerationRepository.Type.FOLLOW_UP)
+                    "initial" -> generationRepository.generate(jobId, GenerationRepository.Type.INITIAL_EMAIL)
+                }
             }
         }
     }

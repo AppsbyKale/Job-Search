@@ -74,6 +74,7 @@ import com.example.jobsearch.ui.documented.editor.EditableProjectBlock
 import com.example.jobsearch.ui.documented.editor.EditableSectionHeader
 import com.example.jobsearch.ui.documented.editor.EditableSkillCategoryBlock
 import com.example.jobsearch.ui.documented.editor.RichTextToolbar
+import com.example.jobsearch.ui.jobdetail.components.CheatSheetOptionsDialog
 
 /**
  * Screen for viewing and editing generated documents with live PDF-style preview.
@@ -281,6 +282,23 @@ private fun PreviewPane(
                     )
                 }
             }
+        }
+
+        if (state.showCheatSheetOptionsDialog) {
+            CheatSheetOptionsDialog(
+                onGenerate = { overview, challenges, dayToDay, highlights, customQ, strengths, weaknesses ->
+                    viewModel.generateCheatSheetWithOptions(
+                        includeOverview = overview,
+                        includeChallenges = challenges,
+                        includeDayToDay = dayToDay,
+                        includeHighlights = highlights,
+                        customQuestions = customQ,
+                        strengths = strengths,
+                        weaknesses = weaknesses
+                    )
+                },
+                onDismiss = { viewModel.showCheatSheetOptions(false) }
+            )
         }
     }
 }
