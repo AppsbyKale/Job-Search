@@ -15,6 +15,7 @@ import com.example.jobsearch.data.Job
 import com.example.jobsearch.data.JobRepository
 import com.example.jobsearch.data.JobStatus
 import com.example.jobsearch.data.SettingsRepository
+import com.example.jobsearch.network.LangSearchClient
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -44,6 +45,7 @@ class JobDetailViewModel @Inject constructor(
     private val generationRepository: GenerationRepository,
     private val trainingRepository: com.example.jobsearch.data.TrainingRepository,
     private val exporter: com.example.jobsearch.document.DocumentExporter,
+    private val langSearchClient: LangSearchClient,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -449,6 +451,32 @@ class JobDetailViewModel @Inject constructor(
             else -> GenerationRepository.Type.BOTH
         }
         generate(type)
+    }
+
+    fun fetchCompanyInfo() {
+        val job = state.value.job ?: return
+        if (job.company.isBlank()) {
+            _notice.value = "Company name is empty."
+            return
+        }
+        viewModelScope.launch {
+            _notice.value = "Searching company background via LangSearch..."
+            try {
+                val searchResult = langSearchClient.searchCompany(job.company, "")
+                val info = if (searchResult.isNotBlank()) {
+                    val synthPrompt = "Summarize the company background, culture, mission, and industry for '${job.company}' based on these search results:\n$searchResult\n\nKeep it concise (2-3 paragraphs)."
+                    modelManager.generate(synthPrompt, source = "Company Search Dialog").trim()
+                } else {
+                    "Could not find web search results for ${job.company}. Make sure your LangSearch API key is entered in Settings -> Cloud AI."
+                }
+                val updated = job.copy(companyInfo = info)
+                repository.updateJob(updated)
+                _notice.value = "Company information updated successfully!"
+            } catch (e: Exception) {
+                Log.e("JobDetailViewModel", "Company search failed", e)
+                _notice.value = "Company search failed: ${e.message}"
+            }
+        }
     }
 
     fun showCompanyInfo(show: Boolean) {

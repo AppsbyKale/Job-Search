@@ -13,6 +13,7 @@ import com.example.jobsearch.data.JobStatus
 import com.example.jobsearch.data.SettingsRepository
 import com.example.jobsearch.data.TrainingRepository
 import com.example.jobsearch.document.DocumentExporter
+import com.example.jobsearch.network.LangSearchClient
 import com.example.jobsearch.ui.jobdetail.JobDetailViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -45,6 +46,7 @@ class JobDetailViewModelTest {
     private val generationRepository: GenerationRepository = mock()
     private val trainingRepository: TrainingRepository = mock()
     private val exporter: DocumentExporter = mock()
+    private val langSearchClient: LangSearchClient = mock()
     private val savedStateHandle: SavedStateHandle = SavedStateHandle(mapOf("jobId" to 1L))
 
     private lateinit var viewModel: JobDetailViewModel
@@ -76,6 +78,7 @@ class JobDetailViewModelTest {
             generationRepository,
             trainingRepository,
             exporter,
+            langSearchClient,
             savedStateHandle
         )
     }

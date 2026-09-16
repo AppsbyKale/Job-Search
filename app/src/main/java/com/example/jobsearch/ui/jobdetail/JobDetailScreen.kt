@@ -449,6 +449,8 @@ fun JobDetailScreen(
         CompanyInfoDialog(
             companyName = job.company,
             companyInfo = job.companyInfo,
+            isSearching = state.notice?.contains("Searching", ignoreCase = true) == true,
+            onFetchCompany = viewModel::fetchCompanyInfo,
             onDismiss = { viewModel.showCompanyInfo(false) }
         )
     }
