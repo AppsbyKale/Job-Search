@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import java.io.File
 
 @Database(
     entities = [
@@ -29,15 +30,26 @@ abstract class JobDatabase : RoomDatabase() {
 
         fun get(context: Context): JobDatabase =
             instance ?: synchronized(this) {
-                instance ?: Room.databaseBuilder(
-                    context.applicationContext,
-                    JobDatabase::class.java,
-                    "jobsearch.db"
-                )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
-                    .fallbackToDestructiveMigration(dropAllTables = true)
-                    .build()
-                    .also { instance = it }
+                instance ?: run {
+                    // Clear stale WAL/SHM journal files to prevent database corruption locks
+                    try {
+                        val dbFile = context.getDatabasePath("jobsearch.db")
+                        File(dbFile.path + "-wal").delete()
+                        File(dbFile.path + "-shm").delete()
+                    } catch (e: Exception) {
+                        // ignore
+                    }
+
+                    Room.databaseBuilder(
+                        context.applicationContext,
+                        JobDatabase::class.java,
+                        "jobsearch.db"
+                    )
+                        .addMigrations(MIGRATION_1_2, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+                        .fallbackToDestructiveMigration(dropAllTables = true)
+                        .build()
+                        .also { instance = it }
+                }
             }
 
         private val MIGRATION_9_10 = object : Migration(9, 10) {
