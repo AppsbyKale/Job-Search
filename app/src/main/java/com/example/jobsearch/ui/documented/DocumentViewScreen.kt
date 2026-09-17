@@ -3,6 +3,7 @@ package com.example.jobsearch.ui.documented
 import android.graphics.Bitmap
 import android.net.Uri
 import android.widget.Toast
+import com.example.jobsearch.ui.jobdetail.components.CheatSheetOptionsDialog
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -148,19 +149,38 @@ fun DocumentViewScreen(
             )
         }
     ) { padding ->
-        if (editing) {
-            StudioPane(
-                state = state,
-                viewModel = viewModel,
-                modifier = Modifier.padding(padding)
-            )
-        } else {
-            PreviewPane(
-                state = state,
-                viewModel = viewModel,
-                pdfLauncher = pdfLauncher,
-                modifier = Modifier.padding(padding)
-            )
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            if (editing) {
+                StudioPane(
+                    state = state,
+                    viewModel = viewModel,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                PreviewPane(
+                    state = state,
+                    viewModel = viewModel,
+                    pdfLauncher = pdfLauncher,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            if (state.showCheatSheetOptionsDialog) {
+                CheatSheetOptionsDialog(
+                    onGenerate = { overview, challenges, dayToDay, highlights, customQ, strengths, weaknesses ->
+                        viewModel.generateCheatSheetWithOptions(
+                            includeOverview = overview,
+                            includeChallenges = challenges,
+                            includeDayToDay = dayToDay,
+                            includeHighlights = highlights,
+                            customQuestions = customQ,
+                            strengths = strengths,
+                            weaknesses = weaknesses
+                        )
+                    },
+                    onDismiss = { viewModel.showCheatSheetOptions(false) }
+                )
+            }
         }
     }
 }
