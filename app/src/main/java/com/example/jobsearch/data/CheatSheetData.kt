@@ -1,6 +1,5 @@
 package com.example.jobsearch.data
 
-import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -246,6 +245,11 @@ data class CheatSheetData(
                             currentS = line.substringAfter(":").trim()
                         } else if (line.startsWith("EXAMPLE ANSWER:") || line.startsWith("Example Answer:") || line.startsWith("exampleAnswer:")) {
                             currentA.append(line.substringAfter(":").trim()).append("\n")
+                        } else if (currentA.toString().isNotBlank() && line.isNotBlank() && !line.contains(":")) {
+                            // Automatically switch to Notes if extra text is typed below the last answer without Q: prefix
+                            commitQuestion()
+                            section = 5
+                            notesBuilder.append(rawLine).append("\n")
                         } else if (currentQ.isNotBlank()) {
                             currentA.append(line).append("\n")
                         }
