@@ -481,12 +481,6 @@ class JobDetailViewModel @Inject constructor(
 
     fun showCompanyInfo(show: Boolean) {
         _showCompanyInfoDialog.value = show
-        if (show) {
-            val job = state.value.job
-            if (job != null && job.companyInfo.isBlank() && job.company.isNotBlank()) {
-                fetchCompanyInfo()
-            }
-        }
     }
 
     fun showCheatSheetOptions(show: Boolean) {

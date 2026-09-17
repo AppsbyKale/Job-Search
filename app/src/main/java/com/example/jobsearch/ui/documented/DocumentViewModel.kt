@@ -275,7 +275,8 @@ class DocumentViewModel @Inject constructor(
             resumeLayout = isResume,
             coverLetterLayout = !isResume && !isCheat,
             cheatSheetLayout = isCheat,
-            date = todayFormatted()
+            date = todayFormatted(),
+            companyName = _state.value.company
         )
     }
 
@@ -288,7 +289,8 @@ class DocumentViewModel @Inject constructor(
             resumeLayout = isResume,
             coverLetterLayout = !isResume && !isCheat,
             cheatSheetLayout = isCheat,
-            date = todayFormatted()
+            date = todayFormatted(),
+            companyName = _state.value.company
         )
     }
 
