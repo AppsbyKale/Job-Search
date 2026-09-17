@@ -17,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -42,9 +43,15 @@ fun CompanyInfoDialog(
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Searching company background and culture via LangSearch...",
+                        "Searching LangSearch API...",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        "Query sent: \"${companyName} company overview mission culture industry values\"",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontFamily = FontFamily.Monospace
                     )
                 } else if (companyInfo.isBlank()) {
                     Text(

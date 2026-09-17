@@ -460,7 +460,8 @@ class JobDetailViewModel @Inject constructor(
             return
         }
         viewModelScope.launch {
-            _notice.value = "Searching company background via LangSearch..."
+            val query = "${job.company} company overview mission culture industry values"
+            _notice.value = "LangSearch Query: \"$query\"..."
             try {
                 val searchResult = langSearchClient.searchCompany(job.company, "")
                 if (searchResult.isNotBlank()) {
@@ -469,16 +470,16 @@ class JobDetailViewModel @Inject constructor(
                     if (info.isNotBlank()) {
                         val updated = job.copy(companyInfo = info)
                         repository.updateJob(updated)
-                        _notice.value = "Company information updated successfully!"
+                        _notice.value = "Company info updated! (Query: \"$query\")"
                     } else {
-                        _notice.value = "Could not generate company summary from search results."
+                        _notice.value = "Could not generate summary. (Query: \"$query\")"
                     }
                 } else {
-                    _notice.value = "Could not find web search results for ${job.company}. Make sure your LangSearch API key is entered in Settings -> Cloud AI."
+                    _notice.value = "No search results found. (Query: \"$query\") Check LangSearch API key in Settings -> Cloud AI."
                 }
             } catch (e: Exception) {
                 Log.e("JobDetailViewModel", "Company search failed", e)
-                _notice.value = "Company search failed: ${e.message}"
+                _notice.value = "Company search failed: ${e.message} (Query: \"$query\")"
             }
         }
     }
