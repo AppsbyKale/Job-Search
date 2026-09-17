@@ -64,11 +64,12 @@ class DocumentExporter(private val context: Context) {
         resumeLayout: Boolean = false,
         coverLetterLayout: Boolean = false,
         cheatSheetLayout: Boolean = false,
-        date: String = ""
+        date: String = "",
+        companyName: String = ""
     ): Boolean = runCatching {
         PDFBoxResourceLoader.init(context.applicationContext)
         val out = context.contentResolver.openOutputStream(uri) ?: return false
-        out.use { writePdfToStream(it, text, resumeLayout, coverLetterLayout, cheatSheetLayout, date) }
+        out.use { writePdfToStream(it, text, resumeLayout, coverLetterLayout, cheatSheetLayout, date, companyName) }
         true
     }.getOrDefault(false)
 
@@ -80,12 +81,13 @@ class DocumentExporter(private val context: Context) {
         resumeLayout: Boolean = false,
         coverLetterLayout: Boolean = false,
         cheatSheetLayout: Boolean = false,
-        date: String = ""
+        date: String = "",
+        companyName: String = ""
     ): List<Bitmap>? = runCatching {
         PDFBoxResourceLoader.init(context.applicationContext)
         val file = File(context.cacheDir, "preview_${System.nanoTime()}.pdf")
         try {
-            file.outputStream().use { writePdfToStream(it, text, resumeLayout, coverLetterLayout, cheatSheetLayout, date) }
+            file.outputStream().use { writePdfToStream(it, text, resumeLayout, coverLetterLayout, cheatSheetLayout, date, companyName) }
             renderPdfFile(file)
         } finally {
             file.delete()
@@ -98,7 +100,8 @@ class DocumentExporter(private val context: Context) {
         resumeLayout: Boolean,
         coverLetterLayout: Boolean,
         cheatSheetLayout: Boolean,
-        date: String
+        date: String,
+        companyName: String
     ) {
         val font = DocumentStyle.font
         val boldFont = DocumentStyle.boldFont
@@ -404,33 +407,62 @@ class DocumentExporter(private val context: Context) {
                     renderLine(finalCoverLetterData.signature, font, fontSize, leading, false)
                 }
             } else if (finalCheatSheetData != null) {
-                renderLine("Interview Cheat Sheet", boldFont, resumeNameFontSize, resumeNameLeading, true)
+                val effFontSize = 9.5f
+                val effHeaderSize = 11.5f
+                val effLeading = 12.5f
+
+                renderLine("${companyName.ifBlank { "Company" }} Research", boldFont, resumeNameFontSize, resumeNameLeading, true)
                 y -= 12f
+
+                if (finalCheatSheetData.aboutCompany.isNotBlank()) {
+                    renderLine("ABOUT THE COMPANY", boldFont, effHeaderSize, effLeading, false)
+                    renderHorizontalDivider()
+                    y -= 4f
+                    renderLine(finalCheatSheetData.aboutCompany, font, effFontSize, effLeading, false)
+                    y -= 8f
+                }
+
+                if (finalCheatSheetData.relevantSkills.isNotEmpty()) {
+                    renderLine("RELEVANT SKILLS", boldFont, effHeaderSize, effLeading, false)
+                    renderHorizontalDivider()
+                    y -= 4f
+                    renderLine(finalCheatSheetData.relevantSkills.joinToString(", "), font, effFontSize, effLeading, false)
+                    y -= 8f
+                }
                 
                 if (finalCheatSheetData.keyHighlights.isNotEmpty()) {
-                    renderLine("KEY HIGHLIGHTS", boldFont, headerFontSize, leading, false)
+                    renderLine("KEY HIGHLIGHTS", boldFont, effHeaderSize, effLeading, false)
                     renderHorizontalDivider()
-                    y -= 6f
+                    y -= 4f
                     for (h in finalCheatSheetData.keyHighlights) {
-                        renderLine("• $h", font, fontSize, leading, false)
-                        y -= 4f
+                        renderLine("• $h", font, effFontSize, effLeading, false)
+                        y -= 2f
                     }
                     y -= 8f
                 }
                 
                 if (finalCheatSheetData.toughQuestions.isNotEmpty()) {
-                    renderLine("TOUGH QUESTIONS & STRATEGIES", boldFont, headerFontSize, leading, false)
+                    renderLine("Q&A", boldFont, effHeaderSize, effLeading, false)
                     renderHorizontalDivider()
-                    y -= 6f
+                    y -= 4f
                     for (tq in finalCheatSheetData.toughQuestions) {
-                        renderLine("Q: ${tq.question}", boldFont, fontSize, leading, false)
+                        renderLine("Q: ${tq.question}", boldFont, effFontSize, effLeading, false)
                         if (tq.strategy.isNotBlank()) {
-                            renderLine("Strategy: ${tq.strategy}", italicFont, fontSize, leading, false)
+                            renderLine("STRATEGY: ${tq.strategy}", italicFont, effFontSize, effLeading, false)
                         }
                         if (tq.exampleAnswer.isNotBlank()) {
-                            renderLine("Example Answer: ${tq.exampleAnswer}", font, fontSize, leading, false)
+                            renderLine("EXAMPLE ANSWER:\n${tq.exampleAnswer}", font, effFontSize, effLeading, false)
                         }
-                        y -= 8f
+                        y -= 6f
+                    }
+                }
+
+                if (finalCheatSheetData.notes.isNotBlank()) {
+                    renderLine("NOTES", boldFont, effHeaderSize, effLeading, false)
+                    renderHorizontalDivider()
+                    y -= 4f
+                    for (line in finalCheatSheetData.notes.replace("\r\n", "\n").split("\n")) {
+                        renderLine(line, font, effFontSize, effLeading, false)
                     }
                 }
             } else {

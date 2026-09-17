@@ -413,24 +413,29 @@ object PromptBuilder {
         }.joinToString("\n")
 
         return """
-            You are an expert interview coach. Create a concise "Interview Cheat Sheet" for the candidate based on the job, company info, and their resume.
-            Focus on high-impact points and preparing for difficult questions.
+            You are an expert interview coach. Create a comprehensive research document titled "${job.company} Research" for the candidate based on the job, company info, and their resume.
+            Focus on high-impact points, company background, relevant skills, Q&A, and notes.
 
             FOCUS INSTRUCTIONS:
             $focusInstructions
 
             STRICT RULES:
+            - aboutCompany: A short 2-3 sentence executive paragraph summarizing the company's background, culture, and mission.
+            - relevantSkills: 5-8 key technical and domain skills bridging the candidate's resume to this job.
             - keyHighlights: 4-5 bullet points of the candidate's strongest selling points for THIS specific job.
-            - toughQuestions: Generate questions including any user custom questions above, plus job-specific and standard questions.
-            - For each question, provide a "strategy" and a "exampleAnswer" (a 2-3 sentence first-person response).
+            - toughQuestions: Generate questions including any user custom questions above, plus job-specific and standard questions. For each question, provide a "strategy" and an "exampleAnswer" (2-3 sentence first-person response).
+            - notes: Leave empty ("") for free-form user notes.
             - Output ONLY raw JSON. No markdown.
 
             EXACT JSON schema:
             {
-              "keyHighlights": ["Point 1", "Point 2", "Point 3", "Point 4"],
+              "aboutCompany": "Short company overview paragraph...",
+              "relevantSkills": ["Skill 1", "Skill 2"],
+              "keyHighlights": ["Point 1", "Point 2"],
               "toughQuestions": [
                 { "question": "Q1", "strategy": "Strategy 1", "exampleAnswer": "I would say..." }
-              ]
+              ],
+              "notes": ""
             }
             $companyBlock
             $strengthsBlock

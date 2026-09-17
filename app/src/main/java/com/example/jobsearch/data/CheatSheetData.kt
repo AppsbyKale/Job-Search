@@ -38,35 +38,56 @@ data class ToughQuestion(
 }
 
 data class CheatSheetData(
+    val aboutCompany: String = "",
+    val relevantSkills: List<String> = emptyList(),
     val keyHighlights: List<String> = emptyList(),
-    val toughQuestions: List<ToughQuestion> = emptyList()
+    val toughQuestions: List<ToughQuestion> = emptyList(),
+    val notes: String = ""
 ) {
-    fun isSubstantial(): Boolean = keyHighlights.isNotEmpty() || toughQuestions.isNotEmpty()
+    fun isSubstantial(): Boolean = aboutCompany.isNotBlank() || relevantSkills.isNotEmpty() || keyHighlights.isNotEmpty() || toughQuestions.isNotEmpty() || notes.isNotBlank()
 
     fun toJson(): String {
-        val json = JSONObject()
-        json.put("keyHighlights", JSONArray(keyHighlights))
-        val questionsArray = JSONArray()
-        toughQuestions.forEach { tq ->
-            val obj = JSONObject()
-            obj.put("question", tq.question)
-            obj.put("strategy", tq.strategy)
-            obj.put("exampleAnswer", tq.exampleAnswer)
-            questionsArray.put(obj)
+        val json = JSONObject().apply {
+            put("aboutCompany", aboutCompany)
+            put("relevantSkills", JSONArray(relevantSkills))
+            put("keyHighlights", JSONArray(keyHighlights))
+            val questionsArray = JSONArray()
+            toughQuestions.forEach { tq ->
+                val obj = JSONObject()
+                obj.put("question", tq.question)
+                obj.put("strategy", tq.strategy)
+                obj.put("exampleAnswer", tq.exampleAnswer)
+                questionsArray.put(obj)
+            }
+            put("toughQuestions", questionsArray)
+            put("notes", notes)
         }
-        json.put("toughQuestions", questionsArray)
         return json.toString()
     }
 
     fun toHumanReadableText(): String {
         val sb = StringBuilder()
+        
+        sb.append("ABOUT THE COMPANY\n")
+        if (aboutCompany.isNotBlank()) {
+            sb.append("$aboutCompany\n\n")
+        } else {
+            sb.append("No company overview available.\n\n")
+        }
+
+        if (relevantSkills.isNotEmpty()) {
+            sb.append("RELEVANT SKILLS\n")
+            sb.append(relevantSkills.joinToString(", ")).append("\n\n")
+        }
+
         if (keyHighlights.isNotEmpty()) {
             sb.append("KEY HIGHLIGHTS\n")
             keyHighlights.forEach { sb.append("• $it\n") }
             sb.append("\n")
         }
+
         if (toughQuestions.isNotEmpty()) {
-            sb.append("TOUGH QUESTIONS & STRATEGIES\n")
+            sb.append("Q&A\n")
             toughQuestions.forEach { tq ->
                 sb.append("Q: ${tq.question}\n")
                 if (tq.strategy.isNotBlank()) {
@@ -78,6 +99,12 @@ data class CheatSheetData(
                 sb.append("\n")
             }
         }
+
+        if (notes.isNotBlank()) {
+            sb.append("NOTES\n")
+            sb.append("$notes\n")
+        }
+
         return sb.toString().trim()
     }
 
@@ -88,8 +115,23 @@ data class CheatSheetData(
                 if (scrubbed.isBlank() || !scrubbed.contains("{")) return@runCatching null
                 val json = JSONObject(scrubbed)
                 
+                val about = json.optString("aboutCompany", "").ifBlank { json.optString("about_company", "") }
+
+                val skills = mutableListOf<String>()
+                val skillKeys = listOf("relevantSkills", "relevant_skills", "skills")
+                for (key in skillKeys) {
+                    val array = json.optJSONArray(key)
+                    if (array != null) {
+                        for (i in 0 until array.length()) {
+                            val str = array.optString(i).trim()
+                            if (str.isNotBlank()) skills.add(str)
+                        }
+                        if (skills.isNotEmpty()) break
+                    }
+                }
+
                 val highlights = mutableListOf<String>()
-                val hlKeys = listOf("keyHighlights", "key_highlights", "highlights", "sellingPoints", "selling_points", "keyPoints", "key_points")
+                val hlKeys = listOf("keyHighlights", "key_highlights", "highlights", "sellingPoints")
                 for (key in hlKeys) {
                     val array = json.optJSONArray(key)
                     if (array != null) {
@@ -102,7 +144,7 @@ data class CheatSheetData(
                 }
 
                 val questions = mutableListOf<ToughQuestion>()
-                val qKeys = listOf("toughQuestions", "tough_questions", "questions", "interviewQuestions", "interview_questions", "qa")
+                val qKeys = listOf("toughQuestions", "tough_questions", "questions", "qa")
                 for (key in qKeys) {
                     val array = json.optJSONArray(key)
                     if (array != null) {
@@ -118,7 +160,10 @@ data class CheatSheetData(
                         if (questions.isNotEmpty()) break
                     }
                 }
-                CheatSheetData(highlights, questions)
+
+                val notesStr = json.optString("notes", "").trim()
+
+                CheatSheetData(about, skills, highlights, questions, notesStr)
             }.getOrNull()
 
             if (parsed != null && parsed.isSubstantial()) {
@@ -131,9 +176,13 @@ data class CheatSheetData(
         fun fromText(text: String): CheatSheetData? {
             if (text.isBlank()) return null
 
+            var about = ""
+            val skills = mutableListOf<String>()
             val highlights = mutableListOf<String>()
             val questions = mutableListOf<ToughQuestion>()
+            val notesBuilder = StringBuilder()
 
+            var section = 0 // 0: None, 1: About, 2: Skills, 3: Highlights, 4: QA, 5: Notes
             var currentQ = ""
             var currentS = ""
             var currentA = StringBuilder()
@@ -147,53 +196,68 @@ data class CheatSheetData(
                 }
             }
 
-            val cleanedText = text
-                .replace("{\n", "\n")
-                .replace("}\n", "\n")
-                .replace("\",\n", "\n")
-                .replace("\",", "\n")
-                .replace("[\n", "\n")
-                .replace("]\n", "\n")
-                .replace("\"keyHighlights\": [", "KEY HIGHLIGHTS:")
-                .replace("\"toughQuestions\": [", "TOUGH QUESTIONS:")
-                .replace("\"question\":", "Q:")
-                .replace("\"strategy\":", "STRATEGY:")
-                .replace("\"exampleAnswer\":", "EXAMPLE ANSWER:")
-                .replace("\"example_answer\":", "EXAMPLE ANSWER:")
-                .replace("\"", "")
-
-            val lines = cleanedText.replace("\r\n", "\n").replace('\r', '\n').split("\n")
+            val lines = text.replace("\r\n", "\n").replace('\r', '\n').split("\n")
             for (rawLine in lines) {
                 val line = rawLine.trim()
                 val lower = line.lowercase()
 
-                if (lower.contains("key highlight") || lower.contains("highlights") || lower.contains("selling point")) {
+                if (lower.contains("about the company") || lower.contains("about company")) {
                     commitQuestion()
+                    section = 1
                     continue
-                } else if (lower.contains("tough question") || lower.contains("toughquestions") || lower.contains("questions")) {
+                } else if (lower.contains("relevant skill") || lower.contains("skills")) {
                     commitQuestion()
+                    section = 2
+                    continue
+                } else if (lower.contains("key highlight") || lower.contains("highlights")) {
+                    commitQuestion()
+                    section = 3
+                    continue
+                } else if (lower.contains("q&a") || lower.contains("tough question") || lower.contains("questions")) {
+                    commitQuestion()
+                    section = 4
+                    continue
+                } else if (lower.startsWith("note") || lower.startsWith("notes")) {
+                    commitQuestion()
+                    section = 5
                     continue
                 }
 
-                if (line.startsWith("Q:") || line.startsWith("Question:") || line.startsWith("q:")) {
-                    commitQuestion()
-                    currentQ = line.substringAfter(":").trim()
-                } else if (line.startsWith("STRATEGY:") || line.startsWith("Strategy:") || line.startsWith("strategy:")) {
-                    currentS = line.substringAfter(":").trim()
-                } else if (line.startsWith("EXAMPLE ANSWER:") || line.startsWith("Example Answer:") || line.startsWith("exampleAnswer:")) {
-                    val remaining = line.substringAfter(":").trim()
-                    if (remaining.isNotBlank()) currentA.append(remaining).append("\n")
-                } else if (currentQ.isNotBlank()) {
-                    currentA.append(line).append("\n")
-                } else if (line.isNotBlank() && !line.startsWith("{") && !line.startsWith("}") && !line.startsWith("[") && !line.startsWith("]")) {
-                    val clean = line.removePrefix("•").removePrefix("-").removePrefix("*").trim()
-                    if (clean.isNotBlank()) highlights.add(clean)
+                when (section) {
+                    1 -> {
+                        if (line.isNotBlank()) {
+                            about = if (about.isBlank()) line else "$about $line"
+                        }
+                    }
+                    2 -> {
+                        if (line.isNotBlank()) {
+                            line.split(",").map { it.trim() }.filter { it.isNotBlank() }.forEach { skills.add(it) }
+                        }
+                    }
+                    3 -> {
+                        val clean = line.removePrefix("•").removePrefix("-").removePrefix("*").trim()
+                        if (clean.isNotBlank()) highlights.add(clean)
+                    }
+                    4 -> {
+                        if (line.startsWith("Q:") || line.startsWith("Question:") || line.startsWith("q:")) {
+                            commitQuestion()
+                            currentQ = line.substringAfter(":").trim()
+                        } else if (line.startsWith("STRATEGY:") || line.startsWith("Strategy:") || line.startsWith("strategy:")) {
+                            currentS = line.substringAfter(":").trim()
+                        } else if (line.startsWith("EXAMPLE ANSWER:") || line.startsWith("Example Answer:") || line.startsWith("exampleAnswer:")) {
+                            currentA.append(line.substringAfter(":").trim()).append("\n")
+                        } else if (currentQ.isNotBlank()) {
+                            currentA.append(line).append("\n")
+                        }
+                    }
+                    5 -> {
+                        notesBuilder.append(rawLine).append("\n")
+                    }
                 }
             }
             commitQuestion()
 
-            val data = CheatSheetData(highlights, questions)
-            return if (data.isSubstantial()) data else null
+            return CheatSheetData(about, skills, highlights, questions, notesBuilder.toString().trim())
         }
 
         fun extractJson(text: String): String = JsonScrubber.scrub(text)
