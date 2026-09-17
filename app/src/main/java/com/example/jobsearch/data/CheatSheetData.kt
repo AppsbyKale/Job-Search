@@ -181,7 +181,7 @@ data class CheatSheetData(
             val questions = mutableListOf<ToughQuestion>()
             val notesBuilder = StringBuilder()
 
-            var section = 0 // 0: None, 1: About, 2: Skills, 3: Highlights, 4: QA, 5: Notes
+            var section = 0 // 1: About, 2: Skills, 3: Highlights, 4: QA, 5: Notes
             var currentQ = ""
             var currentS = ""
             var currentA = StringBuilder()
@@ -195,7 +195,15 @@ data class CheatSheetData(
                 }
             }
 
-            val lines = text.replace("\r\n", "\n").replace('\r', '\n').split("\n")
+            val notesIdx = text.indexOf("NOTES", ignoreCase = true)
+            val mainText = if (notesIdx >= 0) {
+                notesBuilder.append(text.substring(notesIdx + 5).removePrefix(":").trim())
+                text.substring(0, notesIdx)
+            } else {
+                text
+            }
+
+            val lines = mainText.replace("\r\n", "\n").replace('\r', '\n').split("\n")
             for (rawLine in lines) {
                 val line = rawLine.trim()
                 val lower = line.lowercase()
@@ -216,26 +224,24 @@ data class CheatSheetData(
                     commitQuestion()
                     section = 4
                     continue
-                } else if (lower.startsWith("note") || lower.startsWith("notes")) {
-                    commitQuestion()
-                    section = 5
-                    continue
                 }
 
                 when (section) {
                     1 -> {
-                        if (line.isNotBlank()) {
+                        if (line.isNotBlank() && !line.startsWith("---") && !line.startsWith("===")) {
                             about = if (about.isBlank()) line else "$about $line"
                         }
                     }
                     2 -> {
-                        if (line.isNotBlank()) {
+                        if (line.isNotBlank() && !line.startsWith("---") && !line.startsWith("===")) {
                             line.split(",").map { it.trim() }.filter { it.isNotBlank() }.forEach { skills.add(it) }
                         }
                     }
                     3 -> {
                         val clean = line.removePrefix("•").removePrefix("-").removePrefix("*").trim()
-                        if (clean.isNotBlank()) highlights.add(clean)
+                        if (clean.isNotBlank() && !clean.startsWith("---") && !clean.startsWith("===")) {
+                            highlights.add(clean)
+                        }
                     }
                     4 -> {
                         if (line.startsWith("Q:") || line.startsWith("Question:") || line.startsWith("q:")) {
@@ -245,17 +251,13 @@ data class CheatSheetData(
                             currentS = line.substringAfter(":").trim()
                         } else if (line.startsWith("EXAMPLE ANSWER:") || line.startsWith("Example Answer:") || line.startsWith("exampleAnswer:")) {
                             currentA.append(line.substringAfter(":").trim()).append("\n")
-                        } else if (currentA.toString().isNotBlank() && line.isNotBlank() && !line.contains(":")) {
-                            // Automatically switch to Notes if extra text is typed below the last answer without Q: prefix
+                        } else if (currentA.toString().isNotBlank() && line.isNotBlank() && !line.contains(":") && !line.startsWith("Q")) {
                             commitQuestion()
                             section = 5
                             notesBuilder.append(rawLine).append("\n")
                         } else if (currentQ.isNotBlank()) {
                             currentA.append(line).append("\n")
                         }
-                    }
-                    5 -> {
-                        notesBuilder.append(rawLine).append("\n")
                     }
                 }
             }

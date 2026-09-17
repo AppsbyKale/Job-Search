@@ -25,7 +25,7 @@ class CloudModelManager(private val settings: SettingsRepository) {
             temperature = 0.4f
             topK = 32
             topP = 0.95f
-            maxOutputTokens = 4096
+            maxOutputTokens = 8192
             responseMimeType = "application/json"
         }
 
