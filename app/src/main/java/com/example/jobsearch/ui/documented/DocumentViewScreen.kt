@@ -238,21 +238,29 @@ private fun PreviewPane(
                     )
                 }
                 itemsIndexed(current.pages) { index, page ->
-                    Image(
-                        bitmap = page.asImageBitmap(),
-                        contentDescription = stringResource(R.string.page_number_desc, index + 1),
-                        contentScale = ContentScale.FillWidth,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(page.width.toFloat() / page.height)
-                            .clip(RoundedCornerShape(4.dp))
-                            .border(
-                                1.dp,
-                                MaterialTheme.colorScheme.outlineVariant,
-                                RoundedCornerShape(4.dp)
-                            )
-                            .background(MaterialTheme.colorScheme.surface)
-                    )
+                    Column(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                        Text(
+                            text = "Page ${index + 1} of ${current.pages.size}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                        Image(
+                            bitmap = page.asImageBitmap(),
+                            contentDescription = stringResource(R.string.page_number_desc, index + 1),
+                            contentScale = ContentScale.FillWidth,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(page.width.toFloat() / page.height)
+                                .clip(RoundedCornerShape(4.dp))
+                                .border(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.outlineVariant,
+                                    RoundedCornerShape(4.dp)
+                                )
+                                .background(MaterialTheme.colorScheme.surface)
+                        )
+                    }
                 }
             }
         }
