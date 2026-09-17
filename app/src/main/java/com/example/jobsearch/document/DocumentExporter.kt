@@ -407,62 +407,58 @@ class DocumentExporter(private val context: Context) {
                     renderLine(finalCoverLetterData.signature, font, fontSize, leading, false)
                 }
             } else if (finalCheatSheetData != null) {
-                val effFontSize = 9.5f
-                val effHeaderSize = 11.5f
-                val effLeading = 12.5f
-
                 renderLine("${companyName.ifBlank { "Company" }} Research", boldFont, resumeNameFontSize, resumeNameLeading, true)
-                y -= 12f
+                y -= 16f
 
                 if (finalCheatSheetData.aboutCompany.isNotBlank()) {
-                    renderLine("ABOUT THE COMPANY", boldFont, effHeaderSize, effLeading, false)
+                    renderLine("ABOUT THE COMPANY", boldFont, headerFontSize, leading, false)
                     renderHorizontalDivider()
-                    y -= 4f
-                    renderLine(finalCheatSheetData.aboutCompany, font, effFontSize, effLeading, false)
-                    y -= 8f
+                    y -= 6f
+                    renderLine(finalCheatSheetData.aboutCompany, font, fontSize, leading, false)
+                    y -= 12f
                 }
 
                 if (finalCheatSheetData.relevantSkills.isNotEmpty()) {
-                    renderLine("RELEVANT SKILLS", boldFont, effHeaderSize, effLeading, false)
+                    renderLine("RELEVANT SKILLS", boldFont, headerFontSize, leading, false)
                     renderHorizontalDivider()
-                    y -= 4f
-                    renderLine(finalCheatSheetData.relevantSkills.joinToString(", "), font, effFontSize, effLeading, false)
-                    y -= 8f
+                    y -= 6f
+                    renderLine(finalCheatSheetData.relevantSkills.joinToString(", "), font, fontSize, leading, false)
+                    y -= 12f
                 }
                 
                 if (finalCheatSheetData.keyHighlights.isNotEmpty()) {
-                    renderLine("KEY HIGHLIGHTS", boldFont, effHeaderSize, effLeading, false)
+                    renderLine("KEY HIGHLIGHTS", boldFont, headerFontSize, leading, false)
                     renderHorizontalDivider()
-                    y -= 4f
+                    y -= 6f
                     for (h in finalCheatSheetData.keyHighlights) {
-                        renderLine("• $h", font, effFontSize, effLeading, false)
-                        y -= 2f
+                        renderLine("• $h", font, fontSize, leading, false)
+                        y -= 4f
                     }
-                    y -= 8f
+                    y -= 12f
                 }
                 
                 if (finalCheatSheetData.toughQuestions.isNotEmpty()) {
-                    renderLine("Q&A", boldFont, effHeaderSize, effLeading, false)
+                    renderLine("Q&A", boldFont, headerFontSize, leading, false)
                     renderHorizontalDivider()
-                    y -= 4f
+                    y -= 6f
                     for (tq in finalCheatSheetData.toughQuestions) {
-                        renderLine("Q: ${tq.question}", boldFont, effFontSize, effLeading, false)
+                        renderLine("Q: ${tq.question}", boldFont, fontSize, leading, false)
                         if (tq.strategy.isNotBlank()) {
-                            renderLine("STRATEGY: ${tq.strategy}", italicFont, effFontSize, effLeading, false)
+                            renderLine("STRATEGY: ${tq.strategy}", italicFont, fontSize, leading, false)
                         }
                         if (tq.exampleAnswer.isNotBlank()) {
-                            renderLine("EXAMPLE ANSWER:\n${tq.exampleAnswer}", font, effFontSize, effLeading, false)
+                            renderLine("EXAMPLE ANSWER:\n${tq.exampleAnswer}", font, fontSize, leading, false)
                         }
-                        y -= 6f
+                        y -= 8f
                     }
                 }
 
                 if (finalCheatSheetData.notes.isNotBlank()) {
-                    renderLine("NOTES", boldFont, effHeaderSize, effLeading, false)
+                    renderLine("NOTES", boldFont, headerFontSize, leading, false)
                     renderHorizontalDivider()
-                    y -= 4f
+                    y -= 6f
                     for (line in finalCheatSheetData.notes.replace("\r\n", "\n").split("\n")) {
-                        renderLine(line, font, effFontSize, effLeading, false)
+                        renderLine(line, font, fontSize, leading, false)
                     }
                 }
             } else {
