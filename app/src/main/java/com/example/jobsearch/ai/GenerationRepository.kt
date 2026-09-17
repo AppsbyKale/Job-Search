@@ -346,8 +346,11 @@ class GenerationRepository(
                     val searchResult = langSearchClient.searchCompany(job.company, "")
                     if (searchResult.isNotBlank()) {
                         val synthPrompt = "Summarize the company background, culture, mission, and industry for '${job.company}' based on these search results:\n$searchResult\n\nKeep it concise (2-3 paragraphs)."
-                        companyInfo = modelManager.generate(synthPrompt, source = "Company Search").trim()
-                        repository.updateJob(job.copy(companyInfo = companyInfo))
+                        val info = modelManager.generate(synthPrompt, source = "Company Search").trim()
+                        if (info.isNotBlank()) {
+                            companyInfo = info
+                            repository.updateJob(job.copy(companyInfo = companyInfo))
+                        }
                     }
                 }
 

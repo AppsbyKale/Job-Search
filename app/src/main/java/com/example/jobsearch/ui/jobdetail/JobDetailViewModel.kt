@@ -463,15 +463,19 @@ class JobDetailViewModel @Inject constructor(
             _notice.value = "Searching company background via LangSearch..."
             try {
                 val searchResult = langSearchClient.searchCompany(job.company, "")
-                val info = if (searchResult.isNotBlank()) {
+                if (searchResult.isNotBlank()) {
                     val synthPrompt = "Summarize the company background, culture, mission, and industry for '${job.company}' based on these search results:\n$searchResult\n\nKeep it concise (2-3 paragraphs)."
-                    modelManager.generate(synthPrompt, source = "Company Search Dialog").trim()
+                    val info = modelManager.generate(synthPrompt, source = "Company Search Dialog").trim()
+                    if (info.isNotBlank()) {
+                        val updated = job.copy(companyInfo = info)
+                        repository.updateJob(updated)
+                        _notice.value = "Company information updated successfully!"
+                    } else {
+                        _notice.value = "Could not generate company summary from search results."
+                    }
                 } else {
-                    "Could not find web search results for ${job.company}. Make sure your LangSearch API key is entered in Settings -> Cloud AI."
+                    _notice.value = "Could not find web search results for ${job.company}. Make sure your LangSearch API key is entered in Settings -> Cloud AI."
                 }
-                val updated = job.copy(companyInfo = info)
-                repository.updateJob(updated)
-                _notice.value = "Company information updated successfully!"
             } catch (e: Exception) {
                 Log.e("JobDetailViewModel", "Company search failed", e)
                 _notice.value = "Company search failed: ${e.message}"
