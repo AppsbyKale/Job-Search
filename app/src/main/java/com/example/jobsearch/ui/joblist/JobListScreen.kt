@@ -63,6 +63,9 @@ import com.example.jobsearch.ui.components.AppCard
 import com.example.jobsearch.ui.components.StatusBadge
 import com.example.jobsearch.util.DateFormatter
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 

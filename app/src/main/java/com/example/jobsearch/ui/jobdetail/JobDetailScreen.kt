@@ -63,6 +63,19 @@ fun JobDetailScreen(
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
+    val savedMsg = stringResource(R.string.saved_to_file_message)
+    val failedMsg = stringResource(R.string.save_failed_message)
+    var exportTargetText by remember { mutableStateOf("") }
+    var exportIsCheat by remember { mutableStateOf(false) }
+
+    val pdfExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/pdf")
+    ) { uri ->
+        if (uri != null) {
+            val ok = viewModel.exportPdf(uri, exportTargetText, exportIsCheat)
+            Toast.makeText(context, if (ok) savedMsg else failedMsg, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     LaunchedEffect(generate) {
         viewModel.onGenerateFromArgs(generate)
@@ -301,6 +314,7 @@ fun JobDetailScreen(
                         text = getDisplayPreview(job.resumeText, isResume = true),
                         onView = { onViewDocument(job.id, "resume", false) },
                         onEdit = { onViewDocument(job.id, "resume", true) },
+                        onExport = { exportTargetText = job.resumeText; exportIsCheat = false; pdfExportLauncher.launch("Resume.pdf") },
                         onDelete = { viewModel.deleteDocument("resume") }
                     )
                 }
@@ -310,6 +324,7 @@ fun JobDetailScreen(
                         text = getDisplayPreview(job.coverLetterText, isResume = false),
                         onView = { onViewDocument(job.id, "cover", false) },
                         onEdit = { onViewDocument(job.id, "cover", true) },
+                        onExport = { exportTargetText = job.coverLetterText; exportIsCheat = false; pdfExportLauncher.launch("CoverLetter.pdf") },
                         onDelete = { viewModel.deleteDocument("cover") }
                     )
                 }
@@ -319,6 +334,7 @@ fun JobDetailScreen(
                         text = getDisplayPreview(job.cheatSheetText, isResume = false),
                         onView = { onViewDocument(job.id, "cheat", false) },
                         onEdit = { onViewDocument(job.id, "cheat", true) },
+                        onExport = { exportTargetText = job.cheatSheetText; exportIsCheat = true; pdfExportLauncher.launch("CheatSheet.pdf") },
                         onDelete = { viewModel.deleteDocument("cheat") }
                     )
                 }
@@ -328,6 +344,7 @@ fun JobDetailScreen(
                         text = getDisplayPreview(job.followUpEmailText, isResume = false),
                         onView = { onViewDocument(job.id, "followup", false) },
                         onEdit = { onViewDocument(job.id, "followup", true) },
+                        onExport = { exportTargetText = job.followUpEmailText; exportIsCheat = false; pdfExportLauncher.launch("FollowUpEmail.pdf") },
                         onDelete = { viewModel.deleteDocument("followup") }
                     )
                 }
@@ -337,6 +354,7 @@ fun JobDetailScreen(
                         text = getDisplayPreview(job.initialEmailText, isResume = false),
                         onView = { onViewDocument(job.id, "initial", false) },
                         onEdit = { onViewDocument(job.id, "initial", true) },
+                        onExport = { exportTargetText = job.initialEmailText; exportIsCheat = false; pdfExportLauncher.launch("InitialEmail.pdf") },
                         onDelete = { viewModel.deleteDocument("initial") }
                     )
                 }
@@ -346,6 +364,7 @@ fun JobDetailScreen(
                         text = job.notes,
                         onView = { viewModel.showNotes(true) },
                         onEdit = { viewModel.showNotes(true) },
+                        onExport = { exportTargetText = job.notes; exportIsCheat = false; pdfExportLauncher.launch("ResearchNotes.pdf") },
                         onDelete = { viewModel.updateNotes("") }
                     )
                 }
@@ -358,6 +377,7 @@ fun JobDetailScreen(
                             text = getDisplayPreview(job.externalResumeText, isResume = true),
                             onView = { onViewDocument(job.id, "external_resume", false) },
                             onEdit = { onViewDocument(job.id, "external_resume", true) },
+                            onExport = { exportTargetText = job.externalResumeText; exportIsCheat = false; pdfExportLauncher.launch("ExternalResume.pdf") },
                             onDelete = { viewModel.saveExternalDocument("resume", "") }
                         )
                     }
@@ -367,6 +387,7 @@ fun JobDetailScreen(
                             text = getDisplayPreview(job.externalCoverLetterText, isResume = false),
                             onView = { onViewDocument(job.id, "external_cover", false) },
                             onEdit = { onViewDocument(job.id, "external_cover", true) },
+                            onExport = { exportTargetText = job.externalCoverLetterText; exportIsCheat = false; pdfExportLauncher.launch("ExternalCoverLetter.pdf") },
                             onDelete = { viewModel.saveExternalDocument("cover", "") }
                         )
                     }
@@ -480,7 +501,9 @@ fun JobDetailScreen(
 
     if (state.showAskAiQuestionDialog) {
         AskAiQuestionDialog(
-            onAsk = viewModel::askAiQuestion,
+            job = job ?: Job(title = "", company = ""),
+            settingsRepository = viewModel.settingsRepository,
+            modelManager = viewModel.modelManager,
             onDismiss = { viewModel.showAskAiQuestion(false) }
         )
     }
@@ -884,6 +907,7 @@ private fun DocumentItemCard(
     text: String,
     onView: () -> Unit,
     onEdit: () -> Unit,
+    onExport: () -> Unit,
     onDelete: () -> Unit
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
@@ -918,6 +942,7 @@ private fun DocumentItemCard(
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 TextButton(onClick = onView) { Text(stringResource(R.string.view_button)) }
                 TextButton(onClick = onEdit) { Text(stringResource(R.string.edit_button)) }
+                TextButton(onClick = onExport) { Text("Export") }
                 TextButton(onClick = { showDeleteConfirm = true }) { Text(stringResource(R.string.delete_button)) }
             }
         }

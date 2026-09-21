@@ -213,32 +213,7 @@ class SyncRepository @Inject constructor(
 
                         systemLog.log("Sync: Received job '${sharedJob.title}' from desktop.")
                         
-                        var cleanedDesc = parser.trimFluff(sharedJob.description)
-                        var jobTags = ""
-                        
-                        if (modelManager.isModelDownloaded()) {
-                            try {
-                                systemLog.log("Sync: Auto-sweeping and tagging job...")
-                                
-                                // 1. Clean
-                                val cleanPrompt = PromptBuilder.smartCleanPrompt(cleanedDesc)
-                                val cleaned = modelManager.generate(cleanPrompt, source = "Sync Auto-Sweep").trim()
-                                if (cleaned.isNotBlank()) {
-                                    trainingRepository.logExample("task", "auto_sweep_sync", cleanPrompt, cleaned)
-                                    cleanedDesc = cleaned
-                                }
-
-                                // 2. Tag
-                                val tagPrompt = PromptBuilder.taggingPrompt(sharedJob.title, sharedJob.description)
-                                val tags = modelManager.generate(tagPrompt, source = "Sync Auto-Tagging").trim()
-                                if (tags.isNotBlank()) {
-                                    trainingRepository.logExample("task", "auto_tagging_sync", tagPrompt, tags)
-                                    jobTags = tags
-                                }
-                            } catch (e: Exception) {
-                                Log.e("SyncServer", "AI Sweep/Tag failed", e)
-                            }
-                        }
+                        val cleanedDesc = parser.trimFluff(sharedJob.description)
 
                         val job = Job(
                             title = sharedJob.title,
@@ -248,19 +223,45 @@ class SyncRepository @Inject constructor(
                             dateAdded = System.currentTimeMillis(),
                             status = JobStatus.SYNCED.name,
                             notes = sharedJob.notes ?: "",
-                            tags = jobTags
+                            tags = ""
                         )
                         Log.d("SyncServer", "Saving job to database...")
-                        val id = try {
-                            withContext(Dispatchers.IO + NonCancellable) {
-                                jobRepository.addJob(job)
-                            }
-                        } catch (e: Exception) {
-                            Log.e("SyncServer", "Failed to save job: ${e.message}")
-                            throw e
+                        val id = withContext(Dispatchers.IO + NonCancellable) {
+                            jobRepository.addJob(job)
                         }
                         Log.i("SyncServer", "Successfully added job with ID: $id")
                         systemLog.log("Sync: Job saved (ID: $id).")
+                        
+                        // Respond to client IMMEDIATELY to prevent browser/addon timeout
+                        call.respond(HttpStatusCode.OK, SyncResponse(status = "success", id = id))
+
+                        // Run AI auto-sweep and tagging asynchronously in background
+                        if (modelManager.isModelDownloaded()) {
+                            CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
+                                try {
+                                    systemLog.log("Sync: Auto-sweeping and tagging job in background...")
+                                    
+                                    val cleanPrompt = PromptBuilder.smartCleanPrompt(cleanedDesc)
+                                    val cleaned = modelManager.generate(cleanPrompt, source = "Sync Auto-Sweep").trim()
+                                    val finalDesc = if (cleaned.isNotBlank()) {
+                                        trainingRepository.logExample("task", "auto_sweep_sync", cleanPrompt, cleaned)
+                                        cleaned
+                                    } else cleanedDesc
+
+                                    val tagPrompt = PromptBuilder.taggingPrompt(sharedJob.title, sharedJob.description)
+                                    val tags = modelManager.generate(tagPrompt, source = "Sync Auto-Tagging").trim()
+                                    if (tags.isNotBlank()) {
+                                        trainingRepository.logExample("task", "auto_tagging_sync", tagPrompt, tags)
+                                    }
+
+                                    jobRepository.getJob(id)?.let { savedJob ->
+                                        jobRepository.updateJob(savedJob.copy(description = finalDesc, tags = tags))
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e("SyncServer", "Background AI Sweep/Tag failed", e)
+                                }
+                            }
+                        }
                         
                         // Track last 5 jobs
                         _recentSyncs.value = (listOf(sharedJob.title.ifBlank { sharedJob.company }) + _recentSyncs.value).take(5)
@@ -270,14 +271,17 @@ class SyncRepository @Inject constructor(
                         } catch (e: Exception) {
                             Log.e("SyncServer", "Failed to show notification, but job was added", e)
                         }
-                        call.respond(HttpStatusCode.OK, SyncResponse(status = "success", id = id))
                     } catch (e: Exception) {
                         Log.e("SyncServer", "Critical error in /add-job", e)
-                        call.respond(HttpStatusCode.InternalServerError, SyncResponse(
-                            status = "error", 
-                            message = e.message ?: "Unknown error",
-                            type = e.javaClass.simpleName
-                        ))
+                        try {
+                            call.respond(HttpStatusCode.InternalServerError, SyncResponse(
+                                status = "error", 
+                                message = e.message ?: "Unknown error",
+                                type = e.javaClass.simpleName
+                            ))
+                        } catch (respEx: Exception) {
+                            // Response already sent or connection closed
+                        }
                     }
                 }
                 get("/status") {

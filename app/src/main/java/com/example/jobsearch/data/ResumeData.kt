@@ -301,18 +301,49 @@ data class ResumeData(
                     "experience", "relevant work experience", "work experience" -> {
                         var i = 0
                         while (i < lines.size) {
-                            val headerLine = lines[i].trim()
-                            if (headerLine.isEmpty()) { i++; continue }
-                            val datesLine = lines.getOrNull(i+1)?.trim() ?: ""
+                            val line1 = lines.getOrNull(i)?.trim() ?: ""
+                            if (line1.isEmpty()) { i++; continue }
+                            val line2 = lines.getOrNull(i+1)?.trim() ?: ""
+                            val line3 = lines.getOrNull(i+2)?.trim() ?: ""
+
+                            val isLine2Dates = line2.contains(Regex("\\d{4}")) || line2.contains("Present", true) || line2.contains("Current", true)
+                            val isLine3Dates = line3.contains(Regex("\\d{4}")) || line3.contains("Present", true) || line3.contains("Current", true)
+
+                            var headerStr = line1
+                            var datesLine = ""
+                            var bulletsStartIndex = i + 2
+
+                            if (isLine2Dates) {
+                                datesLine = line2
+                                bulletsStartIndex = i + 2
+                            } else if (isLine3Dates) {
+                                headerStr = "$line1 | $line2"
+                                datesLine = line3
+                                bulletsStartIndex = i + 3
+                            } else {
+                                datesLine = line2
+                                bulletsStartIndex = i + 2
+                            }
+
                             val bullets = mutableListOf<String>()
-                            var j = i + 2
-                            while (j < lines.size && (lines[j].trim().startsWith("-") || lines[j].isBlank())) {
-                                if (lines[j].isNotBlank()) bullets.add(lines[j].trim().removePrefix("-").trim())
+                            var j = bulletsStartIndex
+                            while (j < lines.size && (lines[j].trim().startsWith("-") || lines[j].trim().startsWith("•") || lines[j].isBlank())) {
+                                val b = lines[j].trim()
+                                if (b.isNotBlank()) bullets.add(b.removePrefix("-").removePrefix("•").trim())
                                 j++
                             }
-                            val parts = headerLine.split("|").map { it.trim() }
+
+                            val delimiters = listOf("|", "–", "—", " at ", ",", "-")
+                            var parts = listOf(headerStr)
+                            for (d in delimiters) {
+                                if (headerStr.contains(d)) {
+                                    parts = headerStr.split(d).map { it.trim() }.filter { it.isNotEmpty() }
+                                    if (parts.size >= 2) break
+                                }
+                            }
+
                             experience.add(ExperienceItem(
-                                title = parts.getOrNull(0) ?: "",
+                                title = parts.getOrNull(0) ?: headerStr,
                                 company = parts.getOrNull(1) ?: "",
                                 location = parts.getOrNull(2) ?: "",
                                 dates = datesLine,

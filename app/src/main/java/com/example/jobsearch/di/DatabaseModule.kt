@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.jobsearch.data.InterviewDao
 import com.example.jobsearch.data.JobDao
 import com.example.jobsearch.data.JobDatabase
+import com.example.jobsearch.data.TrainingExampleDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -32,7 +33,7 @@ object DatabaseModule {
     }
 
     @Provides
-    fun provideTrainingExampleDao(database: JobDatabase): com.example.jobsearch.data.TrainingExampleDao {
+    fun provideTrainingExampleDao(database: JobDatabase): TrainingExampleDao {
         return database.trainingExampleDao()
     }
 }
