@@ -198,7 +198,9 @@ fun AddJobScreen(
                     value = state.title,
                     onValueChange = viewModel::onTitleChange,
                     label = { Text(stringResource(R.string.job_title_label)) },
-                    singleLine = true,
+                    singleLine = false,
+                    minLines = 1,
+                    maxLines = 2,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -209,7 +211,9 @@ fun AddJobScreen(
                     value = state.company,
                     onValueChange = viewModel::onCompanyChange,
                     label = { Text(stringResource(R.string.company_label)) },
-                    singleLine = true,
+                    singleLine = false,
+                    minLines = 1,
+                    maxLines = 2,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                     modifier = Modifier.fillMaxWidth()
                 )

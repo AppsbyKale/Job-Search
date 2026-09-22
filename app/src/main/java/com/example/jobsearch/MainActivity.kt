@@ -120,9 +120,13 @@ private fun JobSearchNavHost(
                 jobId = if (jobId == -1L) null else jobId,
                 onBack = { navController.popBackStack() },
                 onJobSaved = { id, generate ->
-                    val query = if (generate.isNullOrBlank()) "" else "?generate=$generate"
-                    navController.navigate("job/$id$query") {
-                        popUpTo("jobs") { inclusive = false }
+                    if (jobId != -1L) {
+                        navController.popBackStack("jobs", inclusive = false)
+                    } else {
+                        val query = if (generate.isNullOrBlank()) "" else "?generate=$generate"
+                        navController.navigate("job/$id$query") {
+                            popUpTo("jobs") { inclusive = false }
+                        }
                     }
                 }
             )

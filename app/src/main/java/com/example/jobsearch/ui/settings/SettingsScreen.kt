@@ -83,9 +83,14 @@ import com.example.jobsearch.R
 import com.example.jobsearch.ui.components.AppCard
 import com.example.jobsearch.ui.components.ErrorCard
 import com.example.jobsearch.ui.components.SectionHeader
+import com.example.jobsearch.ui.settings.sections.CloudAiSection
+import com.example.jobsearch.ui.settings.sections.DataPrivacySection
+import com.example.jobsearch.ui.settings.sections.ExportSection
 import com.example.jobsearch.ui.settings.sections.ModelSection
 import com.example.jobsearch.ui.settings.sections.ResumeSection
+import com.example.jobsearch.ui.settings.sections.SchedulingSection
 import com.example.jobsearch.ui.settings.sections.ServerSettingsDialog
+import com.example.jobsearch.ui.settings.sections.TrainingSection
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -94,7 +99,8 @@ enum class SettingsSection(val title: String) {
     AI_MODELS("AI Models"),
     SERVER_INFO("Server Info"),
     LOGGING_DEBUG("Logging / Debug"),
-    EXPORT_BACKUP("Export / Backup")
+    EXPORT_BACKUP("Export / Backup"),
+    SCHEDULING("Scheduling")
 }
 
 /**
@@ -163,6 +169,12 @@ fun SettingsScreen(
         contract = ActivityResultContracts.CreateDocument("text/csv")
     ) { uri: Uri? ->
         uri?.let { viewModel.exportCsv(it) }
+    }
+
+    val csvImportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let { viewModel.importCsv(it) }
     }
 
     val trainingLauncher = rememberLauncherForActivityResult(
@@ -400,7 +412,17 @@ fun SettingsScreen(
                     )
 
                     ExportSection(
-                        onExportCsv = { csvLauncher.launch("jobsearch_jobs.csv") }
+                        onExportCsv = { csvLauncher.launch("jobsearch_jobs.csv") },
+                        onImportCsv = { csvImportLauncher.launch(arrayOf("text/csv", "text/comma-separated-values", "application/csv", "*/*")) }
+                    )
+                }
+
+                SettingsSection.SCHEDULING -> {
+                    SchedulingSection(
+                        state = state,
+                        onAddTime = viewModel::addFollowupInterval,
+                        onRemoveTime = viewModel::removeFollowupInterval,
+                        onTimeChange = viewModel::setFollowupTime
                     )
                 }
             }
@@ -419,211 +441,6 @@ class FirstFourMaskVisualTransformation(private val visible: Boolean) : VisualTr
             override fun transformedToOriginal(offset: Int): Int = offset
         }
         return TransformedText(androidx.compose.ui.text.AnnotatedString(masked), offsetMapping)
-    }
-}
-
-@Composable
-private fun CloudAiSection(
-    state: SettingsViewModel.UiState,
-    onApiKeyChange: (String) -> Unit,
-    onSaveKey: () -> Unit,
-    onToggleUseCustom: (Boolean) -> Unit,
-    onLangSearchKeyChange: (String) -> Unit,
-    onSaveLangSearchKey: () -> Unit
-) {
-    var geminiVisible by remember { mutableStateOf(false) }
-    var langVisible by remember { mutableStateOf(false) }
-
-    AppCard(modifier = Modifier.fillMaxWidth()) {
-        SectionHeader(stringResource(R.string.cloud_ai_section_title))
-        Text(
-            stringResource(R.string.cloud_ai_section_description),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(12.dp))
-        
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Use Custom API Key", style = MaterialTheme.typography.bodyMedium)
-            Switch(
-                checked = state.useCustomApiKey,
-                onCheckedChange = onToggleUseCustom
-            )
-        }
-
-        if (state.useCustomApiKey) {
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = state.geminiApiKey,
-                onValueChange = onApiKeyChange,
-                label = { Text(stringResource(R.string.gemini_api_key_label)) },
-                singleLine = true,
-                visualTransformation = FirstFourMaskVisualTransformation(geminiVisible),
-                trailingIcon = {
-                    IconButton(onClick = { geminiVisible = !geminiVisible }) {
-                        Icon(
-                            imageVector = if (geminiVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = if (geminiVisible) "Hide API Key" else "Show API Key"
-                        )
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = onSaveKey,
-                enabled = !state.busy,
-                modifier = Modifier.fillMaxWidth()
-            ) { Text(stringResource(R.string.save_key_button)) }
-
-            Spacer(Modifier.height(16.dp))
-            OutlinedTextField(
-                value = state.langSearchApiKey,
-                onValueChange = onLangSearchKeyChange,
-                label = { Text("LangSearch API Key") },
-                singleLine = true,
-                visualTransformation = FirstFourMaskVisualTransformation(langVisible),
-                trailingIcon = {
-                    IconButton(onClick = { langVisible = !langVisible }) {
-                        Icon(
-                            imageVector = if (langVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = if (langVisible) "Hide API Key" else "Show API Key"
-                        )
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = onSaveLangSearchKey,
-                enabled = !state.busy,
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("Save LangSearch API Key") }
-        }
-    }
-}
-
-@Composable
-private fun DataPrivacySection(
-    state: SettingsViewModel.UiState,
-    onBackup: () -> Unit,
-    onRestore: () -> Unit,
-    onClearDatabase: () -> Unit
-) {
-    var showClearConfirm by remember { mutableStateOf(false) }
-
-    AppCard(modifier = Modifier.fillMaxWidth()) {
-        SectionHeader(stringResource(R.string.data_privacy_section_title))
-        Text(
-            stringResource(R.string.data_privacy_section_description),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(12.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Button(
-                onClick = onBackup,
-                enabled = !state.busy,
-                modifier = Modifier.weight(1f)
-            ) { Text(stringResource(R.string.backup_data_button)) }
-
-            OutlinedButton(
-                onClick = onRestore,
-                enabled = !state.busy,
-                modifier = Modifier.weight(1f)
-            ) { Text(stringResource(R.string.restore_data_button)) }
-        }
-
-        Spacer(Modifier.height(12.dp))
-        OutlinedButton(
-            onClick = { showClearConfirm = true },
-            enabled = !state.busy,
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Clear Database Jobs")
-        }
-    }
-
-    if (showClearConfirm) {
-        AlertDialog(
-            onDismissRequest = { showClearConfirm = false },
-            title = { Text("Clear All Jobs?") },
-            text = { Text("This will permanently delete all jobs in the app database so you can re-sync from your Chrome addon. Continue?") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showClearConfirm = false
-                        onClearDatabase()
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) { Text("Delete All") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showClearConfirm = false }) { Text("Cancel") }
-            }
-        )
-    }
-}
-
-@Composable
-private fun ExportSection(
-    onExportCsv: () -> Unit
-) {
-    AppCard(modifier = Modifier.fillMaxWidth()) {
-        SectionHeader(stringResource(R.string.export_section_title))
-        Text(
-            stringResource(R.string.export_csv_description),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(12.dp))
-        OutlinedButton(
-            onClick = onExportCsv,
-            modifier = Modifier.fillMaxWidth()
-        ) { Text(stringResource(R.string.export_csv_button)) }
-    }
-}
-
-@Composable
-private fun TrainingSection(
-    state: SettingsViewModel.UiState,
-    onToggle: (Boolean) -> Unit,
-    onExport: () -> Unit
-) {
-    AppCard(modifier = Modifier.fillMaxWidth()) {
-        SectionHeader(stringResource(R.string.training_logging_title))
-        Text(
-            stringResource(R.string.training_logging_description),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(12.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(stringResource(R.string.training_logging_toggle), style = MaterialTheme.typography.bodyLarge)
-            Switch(
-                checked = state.trainingLoggingEnabled,
-                onCheckedChange = onToggle
-            )
-        }
-        if (state.trainingLoggingEnabled) {
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = onExport,
-                modifier = Modifier.fillMaxWidth()
-            ) { Text(stringResource(R.string.export_training_data_button)) }
-        }
     }
 }
 

@@ -15,6 +15,7 @@ import androidx.core.graphics.createBitmap
 import com.example.jobsearch.data.CheatSheetData
 import com.example.jobsearch.data.CoverLetterData
 import com.example.jobsearch.data.Job
+import com.example.jobsearch.data.JobStatus
 import com.example.jobsearch.data.ResumeData
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
@@ -535,5 +536,59 @@ class DocumentExporter(private val context: Context) {
     private fun csvCell(value: String): String {
         val escaped = value.replace("\"", "\"\"")
         return "\"$escaped\""
+    }
+
+    fun parseCsv(text: String): List<Job> {
+        val jobs = mutableListOf<Job>()
+        val lines = text.lines().filter { it.isNotBlank() }
+        if (lines.isEmpty()) return jobs
+        for (i in 1 until lines.size) {
+            val line = lines[i]
+            val cols = parseCsvLine(line)
+            if (cols.size >= 5) {
+                val title = cols.getOrNull(1) ?: "Untitled job"
+                val company = cols.getOrNull(2) ?: ""
+                val status = cols.getOrNull(3) ?: JobStatus.SAVED.name
+                val url = cols.getOrNull(4) ?: ""
+                val tags = cols.getOrNull(5) ?: ""
+                jobs.add(
+                    Job(
+                        title = title,
+                        company = company,
+                        status = if (JobStatus.entries.any { it.name == status }) status else JobStatus.SAVED.name,
+                        url = url,
+                        tags = tags,
+                        dateAdded = System.currentTimeMillis()
+                    )
+                )
+            }
+        }
+        return jobs
+    }
+
+    private fun parseCsvLine(line: String): List<String> {
+        val result = mutableListOf<String>()
+        var cur = StringBuilder()
+        var inQuotes = false
+        var idx = 0
+        while (idx < line.length) {
+            val c = line[idx]
+            if (c == '"') {
+                if (inQuotes && idx + 1 < line.length && line[idx + 1] == '"') {
+                    cur.append('"')
+                    idx++
+                } else {
+                    inQuotes = !inQuotes
+                }
+            } else if (c == ',' && !inQuotes) {
+                result.add(cur.toString())
+                cur = StringBuilder()
+            } else {
+                cur.append(c)
+            }
+            idx++
+        }
+        result.add(cur.toString())
+        return result
     }
 }

@@ -2,6 +2,7 @@ package com.example.jobsearch.data
 
 import android.content.Context
 import android.net.Uri
+import com.example.jobsearch.document.DocumentExporter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -16,7 +17,8 @@ class BackupRepository(
     private val context: Context,
     private val database: JobDatabase,
     private val settingsRepository: SettingsRepository,
-    private val systemLog: SystemLogRepository
+    private val systemLog: SystemLogRepository,
+    private val exporter: DocumentExporter
 ) {
     /**
      * Exports all data to a JSON file at the given URI.
@@ -129,5 +131,20 @@ class BackupRepository(
 
             systemLog.log("RESTORE COMPLETE.")
         } ?: throw IllegalStateException("Could not open input stream for restore.")
+    }
+
+    suspend fun importCsv(uri: Uri) = withContext(Dispatchers.IO) {
+        systemLog.log("Starting CSV import...")
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            val text = input.bufferedReader().readText()
+            val jobs = exporter.parseCsv(text)
+            for (job in jobs) {
+                val existing = database.jobDao().findByTitleAndCompany(job.title, job.company)
+                if (existing == null) {
+                    database.jobDao().insert(job)
+                }
+            }
+            systemLog.log("CSV imported successfully (${jobs.size} jobs).")
+        } ?: throw IllegalStateException("Could not open input stream for CSV import.")
     }
 }

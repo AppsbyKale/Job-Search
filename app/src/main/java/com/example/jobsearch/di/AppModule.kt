@@ -115,9 +115,10 @@ object AppModule {
         @ApplicationContext context: Context,
         database: JobDatabase,
         settingsRepository: SettingsRepository,
-        systemLog: com.example.jobsearch.data.SystemLogRepository
+        systemLog: SystemLogRepository,
+        documentExporter: DocumentExporter
     ): BackupRepository {
-        return BackupRepository(context, database, settingsRepository, systemLog)
+        return BackupRepository(context, database, settingsRepository, systemLog, documentExporter)
     }
 
     @Provides

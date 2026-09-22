@@ -70,6 +70,8 @@ class SettingsViewModel @Inject constructor(
         val runSyncOnStartup: Boolean = false,
         val trainingLoggingEnabled: Boolean = false,
         val useCustomApiKey: Boolean = false,
+        val followupIntervals: String = "7, 14, 30",
+        val followupTime: String = "10:00",
         val allFilesAccess: Boolean = true,
         val isServerRunning: Boolean = false,
         val recentSyncs: List<String> = emptyList(),
@@ -138,6 +140,8 @@ class SettingsViewModel @Inject constructor(
             val apiKey = settingsRepository.geminiApiKey.first()
             val langKey = settingsRepository.langSearchApiKey.first()
             val useCustom = settingsRepository.useCustomApiKey.first()
+            val intervals = settingsRepository.followupIntervals.first()
+            val time = settingsRepository.followupTime.first()
             _state.update {
                 it.copy(
                     resumeText = resume,
@@ -145,9 +149,44 @@ class SettingsViewModel @Inject constructor(
                     modelUrl = url,
                     geminiApiKey = apiKey,
                     langSearchApiKey = langKey,
-                    useCustomApiKey = useCustom
+                    useCustomApiKey = useCustom,
+                    followupIntervals = intervals,
+                    followupTime = time
                 )
             }
+        }
+    }
+
+    fun addFollowupInterval(daysStr: String) {
+        val days = daysStr.toIntOrNull() ?: return
+        viewModelScope.launch {
+            val current = _state.value.followupIntervals
+            val list = current.split(",").map { it.trim().toIntOrNull() }.filterNotNull().toMutableList()
+            if (days > 0 && days !in list) {
+                list.add(days)
+                list.sort()
+                val updated = list.joinToString(", ")
+                settingsRepository.setFollowupIntervals(updated)
+                _state.update { it.copy(followupIntervals = updated, message = "Follow-up interval added.") }
+            }
+        }
+    }
+
+    fun removeFollowupInterval(daysStr: String) {
+        val days = daysStr.toIntOrNull() ?: return
+        viewModelScope.launch {
+            val current = _state.value.followupIntervals
+            val list = current.split(",").map { it.trim().toIntOrNull() }.filterNotNull().filter { it != days }.toMutableList()
+            val updated = list.joinToString(", ")
+            settingsRepository.setFollowupIntervals(updated)
+            _state.update { it.copy(followupIntervals = updated, message = "Follow-up interval removed.") }
+        }
+    }
+
+    fun setFollowupTime(time: String) {
+        viewModelScope.launch {
+            settingsRepository.setFollowupTime(time)
+            _state.update { it.copy(followupTime = time) }
         }
     }
 
@@ -415,6 +454,18 @@ class SettingsViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 _state.update { it.copy(busy = false, error = e.message ?: "CSV export failed.") }
+            }
+        }
+    }
+
+    fun importCsv(uri: Uri) {
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, error = null, message = null) }
+            try {
+                backupRepository.importCsv(uri)
+                _state.update { it.copy(busy = false, message = "CSV imported successfully.") }
+            } catch (e: Exception) {
+                _state.update { it.copy(busy = false, error = e.message ?: "CSV import failed.") }
             }
         }
     }

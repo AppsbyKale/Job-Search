@@ -45,6 +45,7 @@ class GenerationRepository(
         INITIAL_EMAIL("Drafting introductory email..."),
         BOTH("Generating documents..."),
         FOLLOW_UP("Drafting follow-up email..."),
+        THANK_YOU("Drafting post-interview thank you email..."),
         CHEAT_SHEET("Generating cheat sheet...")
     }
 
@@ -238,7 +239,28 @@ class GenerationRepository(
                     repository.updateJob(updated.copy(followUpEmailText = followUpJson))
                 }
 
-                // Phase 4.5: Initial Email
+                // Phase 4.6: Thank You Email
+                if (type == Type.THANK_YOU) {
+                    updateProgress("Drafting post-interview thank you...", 0.7f)
+                    val resumeSource = updated.resumeText.ifBlank { resume }
+                    val prompt = PromptBuilder.thankYouEmailPrompt(updated, resumeSource, steeringPrompt)
+                    Log.d(TAG, "Sending thank you email prompt to Local AI...")
+                    val result = withTimeout(120.seconds) {
+                        modelManager.generate(prompt, source = "Thank You Email").trim()
+                    }
+                    if (result.isBlank()) throw IllegalStateException("Failed to generate thank-you email.")
+                    
+                    trainingRepository.logExample(
+                        appName = "task",
+                        feature = "thank_you_email",
+                        inputPrompt = prompt,
+                        modelOutput = result
+                    )
+
+                    val headerSource = updated.resumeText.ifBlank { resume }
+                    val thankYouJson = CoverLetterComposer.compose(result, headerSource, updated)
+                    repository.updateJob(updated.copy(thankYouEmailText = thankYouJson))
+                }
                 if (type == Type.INITIAL_EMAIL) {
                     updateProgress("Drafting introductory email...", 0.7f)
                     val resumeSource = updated.resumeText.ifBlank { resume }

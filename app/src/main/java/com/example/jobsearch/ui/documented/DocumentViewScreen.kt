@@ -112,6 +112,8 @@ fun DocumentViewScreen(
         "resume" -> stringResource(R.string.resume_label)
         "cheat" -> stringResource(R.string.cheat_sheet_title)
         "followup" -> stringResource(R.string.follow_up_email_title)
+        "initial" -> "Initial Application Email"
+        "thankyou" -> "Post-Interview Thank You Email"
         else -> stringResource(R.string.cover_letter_label)
     }
 

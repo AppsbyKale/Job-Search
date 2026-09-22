@@ -59,8 +59,10 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.jobsearch.R
 import com.example.jobsearch.data.Job
 import com.example.jobsearch.data.JobStatus
+import com.example.jobsearch.ui.joblist.FollowUpDigestDialog
 import com.example.jobsearch.ui.components.AppCard
 import com.example.jobsearch.ui.components.StatusBadge
+import com.example.jobsearch.ui.settings.SettingsSection
 import com.example.jobsearch.util.DateFormatter
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
@@ -83,12 +85,14 @@ fun JobListScreen(
 ) {
     val jobs by viewModel.jobs.collectAsStateWithLifecycle()
     val syncedJobs by viewModel.syncedJobs.collectAsStateWithLifecycle()
+    val pendingFollowUps by viewModel.pendingFollowUps.collectAsStateWithLifecycle()
     val filter by viewModel.filter.collectAsStateWithLifecycle()
     val sortOrder by viewModel.sortOrder.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     var jobToDelete by remember { mutableStateOf<Job?>(null) }
     var isSearchExpanded by remember { mutableStateOf(false) }
     var showSyncedJobsDialog by remember { mutableStateOf(false) }
+    var showFollowUpDigestDialog by remember { mutableStateOf(false) }
     var settingsMenuExpanded by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -137,42 +141,21 @@ fun JobListScreen(
                                 expanded = settingsMenuExpanded,
                                 onDismissRequest = { settingsMenuExpanded = false }
                             ) {
-                                DropdownMenuItem(
-                                    modifier = Modifier.testTag("menu_item_resume"),
-                                    text = { Text("Resume", style = MaterialTheme.typography.bodyLarge) },
-                                    onClick = {
-                                        settingsMenuExpanded = false
-                                        onOpenSettings("RESUME")
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("AI Models") },
-                                    onClick = {
-                                        settingsMenuExpanded = false
-                                        onOpenSettings("AI_MODELS")
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Server Info") },
-                                    onClick = {
-                                        settingsMenuExpanded = false
-                                        onOpenSettings("SERVER_INFO")
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Logging / Debug") },
-                                    onClick = {
-                                        settingsMenuExpanded = false
-                                        onOpenSettings("LOGGING_DEBUG")
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Export / Backup") },
-                                    onClick = {
-                                        settingsMenuExpanded = false
-                                        onOpenSettings("EXPORT_BACKUP")
-                                    }
-                                )
+                                SettingsSection.entries.forEach { section ->
+                                    DropdownMenuItem(
+                                        modifier = if (section == SettingsSection.RESUME) Modifier.testTag("menu_item_resume") else Modifier,
+                                        text = {
+                                            Text(
+                                                section.title,
+                                                style = if (section == SettingsSection.RESUME) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium
+                                            )
+                                        },
+                                        onClick = {
+                                            settingsMenuExpanded = false
+                                            onOpenSettings(section.name)
+                                        }
+                                    )
+                                }
                             }
                         }
                         IconButton(onClick = onAddJob) {
@@ -184,6 +167,29 @@ fun JobListScreen(
         }
     ) { padding ->
         Column(modifier = Modifier.padding(padding)) {
+            if (pendingFollowUps.isNotEmpty()) {
+                Card(
+                    onClick = { showFollowUpDigestDialog = true },
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.onTertiaryContainer)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Follow-Up Needed", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                            Text("${pendingFollowUps.size} application(s) ready for follow-up", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                        }
+                        TextButton(onClick = { showFollowUpDigestDialog = true }) {
+                            Text("View", color = MaterialTheme.colorScheme.onTertiaryContainer)
+                        }
+                    }
+                }
+            }
+
             SortingDropdownRow(
                 selectedFilter = filter,
                 onSelectFilter = viewModel::setFilter,
@@ -229,6 +235,20 @@ fun JobListScreen(
                 viewModel.deleteJob(id)
             },
             onDismiss = { showSyncedJobsDialog = false }
+        )
+    }
+
+    if (showFollowUpDigestDialog) {
+        FollowUpDigestDialog(
+            jobs = pendingFollowUps,
+            onSelectJob = { id ->
+                showFollowUpDigestDialog = false
+                onOpenJob(id)
+            },
+            onMarkFollowedUp = { id ->
+                viewModel.markFollowedUp(id)
+            },
+            onDismiss = { showFollowUpDigestDialog = false }
         )
     }
 

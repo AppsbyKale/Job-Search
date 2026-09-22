@@ -66,6 +66,7 @@ class DocumentViewModel @Inject constructor(
                         "cheat" -> job.cheatSheetText
                         "followup" -> job.followUpEmailText
                         "initial" -> job.initialEmailText
+                        "thankyou" -> job.thankYouEmailText
                         "external_resume" -> job.externalResumeText
                         "external_cover" -> job.externalCoverLetterText
                         else -> job.coverLetterText
@@ -75,7 +76,7 @@ class DocumentViewModel @Inject constructor(
                         when (type) {
                             "resume", "external_resume" -> ResumeData.fromJson(rawText)?.toHumanReadableText() ?: rawText
                             "cheat" -> CheatSheetData.fromJson(rawText)?.toHumanReadableText() ?: rawText
-                            "followup", "initial" -> rawText
+                            "followup", "initial", "thankyou" -> rawText
                             else -> CoverLetterData.fromJson(rawText)?.toHumanReadableText() ?: rawText
                         }
                     } else {
@@ -240,6 +241,7 @@ class DocumentViewModel @Inject constructor(
                 "cheat" -> job.copy(cheatSheetText = textToSave)
                 "followup" -> job.copy(followUpEmailText = textToSave)
                 "initial" -> job.copy(initialEmailText = textToSave)
+                "thankyou" -> job.copy(thankYouEmailText = textToSave)
                 "external_resume" -> job.copy(externalResumeText = textToSave)
                 "external_cover" -> job.copy(externalCoverLetterText = textToSave)
                 else -> job.copy(coverLetterText = textToSave)
@@ -261,6 +263,8 @@ class DocumentViewModel @Inject constructor(
             "resume" -> "resume"
             "cheat" -> "cheat sheet"
             "followup" -> "follow-up email"
+            "initial" -> "initial email"
+            "thankyou" -> "thank you email"
             else -> "cover letter"
         }
         exporter.shareText("$title $label", _state.value.text)
@@ -268,7 +272,7 @@ class DocumentViewModel @Inject constructor(
 
     fun exportPdf(uri: android.net.Uri): Boolean {
         val currentText = _state.value.text
-        val textToExport = prepareTextForProcessing(currentText, "exportPdf")
+        val textToExport = prepareTextForExportOrPreview(currentText)
         return exporter.writePdf(
             uri,
             textToExport,
@@ -283,7 +287,7 @@ class DocumentViewModel @Inject constructor(
     /** Renders the document as PDF pages for the on-screen preview. */
     suspend fun previewPages(): List<Bitmap>? = withContext(Dispatchers.IO) {
         val currentText = _state.value.text
-        val textToRender = prepareTextForProcessing(currentText, "previewPages")
+        val textToRender = prepareTextForExportOrPreview(currentText)
         exporter.renderDocumentPages(
             textToRender,
             resumeLayout = isResume,
@@ -292,6 +296,15 @@ class DocumentViewModel @Inject constructor(
             date = todayFormatted(),
             companyName = _state.value.company
         )
+    }
+
+    private fun prepareTextForExportOrPreview(currentText: String): String {
+        return when (type) {
+            "resume", "external_resume" -> ResumeData.fromJson(currentText)?.toHumanReadableText() ?: currentText
+            "cheat" -> CheatSheetData.fromJson(currentText)?.toHumanReadableText() ?: currentText
+            "followup", "initial", "thankyou" -> currentText
+            else -> CoverLetterData.fromJson(currentText)?.toHumanReadableText() ?: currentText
+        }
     }
 
     private fun prepareTextForProcessing(currentText: String, tag: String): String {
@@ -398,6 +411,7 @@ class DocumentViewModel @Inject constructor(
                     "cover", "external_cover" -> generationRepository.generate(jobId, GenerationRepository.Type.COVER)
                     "followup" -> generationRepository.generate(jobId, GenerationRepository.Type.FOLLOW_UP)
                     "initial" -> generationRepository.generate(jobId, GenerationRepository.Type.INITIAL_EMAIL)
+                    "thankyou" -> generationRepository.generate(jobId, GenerationRepository.Type.THANK_YOU)
                 }
             }
         }

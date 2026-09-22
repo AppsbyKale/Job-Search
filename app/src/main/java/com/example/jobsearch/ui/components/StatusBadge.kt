@@ -34,7 +34,7 @@ fun StatusBadge(
         JobStatus.SYNCED -> MaterialTheme.colorScheme.secondaryContainer
         JobStatus.SAVED -> MaterialTheme.colorScheme.secondaryContainer
         JobStatus.APPLIED -> MaterialTheme.colorScheme.primaryContainer
-        JobStatus.INTERVIEWING -> MaterialTheme.colorScheme.tertiaryContainer
+        JobStatus.INTERVIEWING, JobStatus.INTERVIEWED -> MaterialTheme.colorScheme.tertiaryContainer
         JobStatus.OFFER -> MaterialTheme.colorScheme.primaryContainer
         JobStatus.REJECTED, JobStatus.ARCHIVED -> MaterialTheme.colorScheme.surfaceVariant
     }
@@ -43,7 +43,7 @@ fun StatusBadge(
         JobStatus.SYNCED -> MaterialTheme.colorScheme.onSecondaryContainer
         JobStatus.SAVED -> MaterialTheme.colorScheme.onSecondaryContainer
         JobStatus.APPLIED -> MaterialTheme.colorScheme.onPrimaryContainer
-        JobStatus.INTERVIEWING -> MaterialTheme.colorScheme.onTertiaryContainer
+        JobStatus.INTERVIEWING, JobStatus.INTERVIEWED -> MaterialTheme.colorScheme.onTertiaryContainer
         JobStatus.OFFER -> MaterialTheme.colorScheme.onPrimaryContainer
         JobStatus.REJECTED, JobStatus.ARCHIVED -> MaterialTheme.colorScheme.onSurfaceVariant
     }

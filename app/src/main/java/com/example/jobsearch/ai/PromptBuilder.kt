@@ -50,6 +50,9 @@ object PromptBuilder {
     fun followUpEmailPrompt(job: Job, resumeText: String) =
         EmailPromptBuilder.followUpEmailPrompt(job, resumeText)
 
+    fun thankYouEmailPrompt(job: Job, resumeText: String, interviewNotes: String? = null) =
+        EmailPromptBuilder.thankYouEmailPrompt(job, resumeText, interviewNotes)
+
     fun manualQuestionPrompt(job: Job, resumeText: String, question: String) =
         CheatSheetPromptBuilder.manualQuestionPrompt(job, resumeText, question)
 

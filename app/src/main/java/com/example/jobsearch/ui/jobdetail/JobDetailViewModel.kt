@@ -85,6 +85,7 @@ class JobDetailViewModel @Inject constructor(
         val showJobDescriptionDialog: Boolean = false,
         val showInterviewDialog: Boolean = false,
         val showAskAiQuestionDialog: Boolean = false,
+        val showThankYouDialog: Boolean = false,
         val showNotesDialog: Boolean = false,
         val showExternalUploadDialog: Boolean = false,
         val questions: List<InterviewQuestion> = emptyList(),
@@ -112,6 +113,7 @@ class JobDetailViewModel @Inject constructor(
     private val _showJobDescriptionDialog = MutableStateFlow(false)
     private val _showInterviewDialog = MutableStateFlow(false)
     private val _showAskAiQuestionDialog = MutableStateFlow(false)
+    private val _showThankYouDialog = MutableStateFlow(false)
     private val _showNotesDialog = MutableStateFlow(false)
     private val _showExternalUploadDialog = MutableStateFlow(false)
     private val _questionsRunning = MutableStateFlow(false)
@@ -141,6 +143,7 @@ class JobDetailViewModel @Inject constructor(
         _showJobDescriptionDialog,
         _showInterviewDialog,
         _showAskAiQuestionDialog,
+        _showThankYouDialog,
         _showNotesDialog,
         _showExternalUploadDialog,
         interviewRepository.observeQuestions(jobId),
@@ -168,19 +171,20 @@ class JobDetailViewModel @Inject constructor(
         val jobDesc = args[12] as Boolean
         val showInterview = args[13] as Boolean
         val showAskAi = args[14] as Boolean
-        val showNotes = args[15] as Boolean
-        val externalUploadShow = args[16] as Boolean
+        val thankYouShow = args[15] as Boolean
+        val showNotes = args[16] as Boolean
+        val externalUploadShow = args[17] as Boolean
         @Suppress("UNCHECKED_CAST")
-        val questions = args[17] as List<InterviewQuestion>
+        val questions = args[18] as List<InterviewQuestion>
         @Suppress("UNCHECKED_CAST")
-        val answers = args[18] as List<InterviewAnswer>
-        val qRunning = args[19] as Boolean
-        // args[20] is downloadProgress
-        val mResult = args[21] as MatchResult?
-        val mRunning = args[22] as Boolean
-        val steeringShow = args[23] as Boolean
-        val steeringPrompt = args[24] as String
-        val coverSteeringPrompt = args[25] as String
+        val answers = args[19] as List<InterviewAnswer>
+        val qRunning = args[20] as Boolean
+        // args[21] is downloadProgress
+        val mResult = args[22] as MatchResult?
+        val mRunning = args[23] as Boolean
+        val steeringShow = args[24] as Boolean
+        val steeringPrompt = args[25] as String
+        val coverSteeringPrompt = args[26] as String
 
         val statusObj = job?.let { JobStatus.fromName(it.status) } ?: JobStatus.SAVED
         val hint = when (statusObj) {
@@ -188,6 +192,7 @@ class JobDetailViewModel @Inject constructor(
             JobStatus.SAVED -> "Ready to apply"
             JobStatus.APPLIED -> "Waiting for feedback"
             JobStatus.INTERVIEWING -> "Good luck!"
+            JobStatus.INTERVIEWED -> "Great job on the interview!"
             JobStatus.OFFER -> "Congratulations!"
             JobStatus.REJECTED -> "Keep going!"
             JobStatus.ARCHIVED -> "Stored"
@@ -216,6 +221,7 @@ class JobDetailViewModel @Inject constructor(
             showJobDescriptionDialog = jobDesc,
             showInterviewDialog = showInterview,
             showAskAiQuestionDialog = showAskAi,
+            showThankYouDialog = thankYouShow,
             showNotesDialog = showNotes,
             showExternalUploadDialog = externalUploadShow,
             questions = questions,
@@ -299,6 +305,7 @@ class JobDetailViewModel @Inject constructor(
             "cheat" -> job.copy(cheatSheetText = "")
             "followup" -> job.copy(followUpEmailText = "")
             "initial" -> job.copy(initialEmailText = "")
+            "thankyou" -> job.copy(thankYouEmailText = "")
             else -> job.copy(coverLetterText = "")
         }
         viewModelScope.launch { repository.updateJob(updated) }
@@ -314,6 +321,20 @@ class JobDetailViewModel @Inject constructor(
         generationRepository.generate(jobId, GenerationRepository.Type.INITIAL_EMAIL)
     }
 
+    fun generateThankYouEmail(notes: String? = null) {
+        val s = state.value
+        if (s.generating != null) return
+        if (!s.modelReady) {
+            _notice.value = "The AI model is not downloaded yet. Go to Settings and download it first."
+            return
+        }
+        if (!s.resumeLoaded) {
+            _notice.value = "No resume on file. Add your resume in Settings first."
+            return
+        }
+        generationRepository.generate(jobId, GenerationRepository.Type.THANK_YOU, s.useQaAnswers, steeringPrompt = notes)
+    }
+
     fun showInitialEmail(show: Boolean) { _showInitialEmailDialog.value = show }
     fun showSupplemental(show: Boolean) { _showSupplementalDialog.value = show }
     fun showCheatSheet(show: Boolean) { _showCheatSheetDialog.value = show }
@@ -322,12 +343,21 @@ class JobDetailViewModel @Inject constructor(
     fun showJobDescription(show: Boolean) { _showJobDescriptionDialog.value = show }
     fun showInterview(show: Boolean) { _showInterviewDialog.value = show }
     fun showAskAiQuestion(show: Boolean) { _showAskAiQuestionDialog.value = show }
+    fun showThankYou(show: Boolean) { _showThankYouDialog.value = show }
     fun showNotes(show: Boolean) { _showNotesDialog.value = show }
     fun showExternalUpload(show: Boolean) { _showExternalUploadDialog.value = show }
 
     fun updateNotes(text: String) {
         state.value.job?.let { job ->
             viewModelScope.launch { repository.updateJob(job.copy(notes = text)) }
+        }
+    }
+
+    fun updateCustomFollowupIntervals(intervals: String?) {
+        state.value.job?.let { job ->
+            viewModelScope.launch {
+                repository.updateJob(job.copy(customFollowupIntervals = intervals?.takeIf { it.isNotBlank() }))
+            }
         }
     }
 

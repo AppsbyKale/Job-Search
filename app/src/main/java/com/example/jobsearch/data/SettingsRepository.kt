@@ -69,6 +69,19 @@ class SettingsRepository(private val context: Context) {
     val syncPin: Flow<String> = context.dataStore.data.map { it[keySyncPin] ?: "" }
     val syncToken: Flow<String> = context.dataStore.data.map { it[keySyncToken] ?: "" }
     val syncTokenExpiry: Flow<Long> = context.dataStore.data.map { it[keySyncTokenExpiry] ?: 0L }
+    private val keyFollowupIntervals = stringPreferencesKey("followup_intervals")
+    private val keyFollowupTime = stringPreferencesKey("followup_time")
+
+    val followupIntervals: Flow<String> = context.dataStore.data.map { it[keyFollowupIntervals] ?: "7, 14, 30" }
+    val followupTime: Flow<String> = context.dataStore.data.map { it[keyFollowupTime] ?: "10:00" }
+
+    suspend fun setFollowupIntervals(intervals: String) {
+        context.dataStore.edit { it[keyFollowupIntervals] = intervals }
+    }
+
+    suspend fun setFollowupTime(time: String) {
+        context.dataStore.edit { it[keyFollowupTime] = time }
+    }
 
     suspend fun setResumeText(text: String) {
         context.dataStore.edit { it[keyResumeText] = text }

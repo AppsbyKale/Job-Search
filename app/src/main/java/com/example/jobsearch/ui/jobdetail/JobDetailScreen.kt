@@ -40,6 +40,7 @@ import com.example.jobsearch.ui.components.ErrorCard
 import com.example.jobsearch.ui.components.SectionHeader
 import com.example.jobsearch.ui.components.StatusBadge
 import com.example.jobsearch.ui.interview.InterviewDialog
+import com.example.jobsearch.ui.jobdetail.dialogs.ResumeSteeringDialog
 import com.example.jobsearch.ui.jobdetail.components.CompanyInfoDialog
 import com.example.jobsearch.ui.jobdetail.components.CheatSheetOptionsDialog
 import com.example.jobsearch.util.DateFormatter
@@ -200,6 +201,14 @@ fun JobDetailScreen(
                                 viewModel.showFollowUp(true)
                             }
                         )
+                        DropdownMenuItem(
+                            text = { Text("Post-Interview Thank You Email") },
+                            onClick = {
+                                menuExpanded = false
+                                viewModel.showThankYou(true)
+                            },
+                            leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) }
+                        )
                         HorizontalDivider()
                         DropdownMenuItem(
                             text = { Text("Upload External Doc") },
@@ -348,6 +357,16 @@ fun JobDetailScreen(
                         onDelete = { viewModel.deleteDocument("followup") }
                     )
                 }
+                if (job.hasThankYouEmail) {
+                    DocumentItemCard(
+                        title = "Post-Interview Thank You Email",
+                        text = getDisplayPreview(job.thankYouEmailText, isResume = false),
+                        onView = { onViewDocument(job.id, "thankyou", false) },
+                        onEdit = { onViewDocument(job.id, "thankyou", true) },
+                        onExport = { exportTargetText = job.thankYouEmailText; exportIsCheat = false; pdfExportLauncher.launch("ThankYouEmail.pdf") },
+                        onDelete = { viewModel.deleteDocument("thankyou") }
+                    )
+                }
                 if (job.hasInitialEmail) {
                     DocumentItemCard(
                         title = "Initial Application Email",
@@ -390,6 +409,95 @@ fun JobDetailScreen(
                             onExport = { exportTargetText = job.externalCoverLetterText; exportIsCheat = false; pdfExportLauncher.launch("ExternalCoverLetter.pdf") },
                             onDelete = { viewModel.saveExternalDocument("cover", "") }
                         )
+                    }
+                }
+
+                SectionHeader("Timeline & Scheduling")
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "Date Added: ${DateFormatter.formatDate(job.dateAdded)}",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        job.dateApplied?.let {
+                            Text(
+                                text = "Date Applied: ${DateFormatter.formatDate(it)}",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                        job.dateFollowedUp?.let {
+                            Text(
+                                text = "Last Followed Up: ${DateFormatter.formatDate(it)} (Count: ${job.followupCount})",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+
+                        var showScheduleDialog by remember { mutableStateOf(false) }
+                        val globalIntervals by viewModel.settingsRepository.followupIntervals.collectAsStateWithLifecycle(initialValue = "7, 14, 30")
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Follow-up Schedule",
+                                    style = MaterialTheme.typography.titleSmall
+                                )
+                                Text(
+                                    text = if (job.customFollowupIntervals.isNullOrBlank())
+                                        "Using global schedule ($globalIntervals days)"
+                                    else
+                                        "Custom schedule (${job.customFollowupIntervals} days)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            TextButton(onClick = { showScheduleDialog = true }) {
+                                Text("Customize")
+                            }
+                        }
+
+                        if (showScheduleDialog) {
+                            var customText by remember { mutableStateOf(job.customFollowupIntervals ?: "") }
+                            AlertDialog(
+                                onDismissRequest = { showScheduleDialog = false },
+                                title = { Text("Custom Follow-up Intervals") },
+                                text = {
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text("Enter comma-separated days (e.g., 3, 7, 14). Leave blank to use global settings.")
+                                        OutlinedTextField(
+                                            value = customText,
+                                            onValueChange = { customText = it },
+                                            label = { Text("Intervals (days)") },
+                                            singleLine = true
+                                        )
+                                    }
+                                },
+                                confirmButton = {
+                                    TextButton(onClick = {
+                                        viewModel.updateCustomFollowupIntervals(customText)
+                                        showScheduleDialog = false
+                                    }) {
+                                        Text("Save")
+                                    }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { showScheduleDialog = false }) {
+                                        Text("Cancel")
+                                    }
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -446,6 +554,17 @@ fun JobDetailScreen(
                 context.startActivity(Intent.createChooser(intent, "Open in Gmail"))
             },
             onDismiss = { viewModel.showFollowUp(false) }
+        )
+    }
+
+    if (state.showThankYouDialog) {
+        ThankYouDialog(
+            job = job,
+            running = state.generationType == GenerationRepository.Type.THANK_YOU,
+            onGenerate = { notes ->
+                viewModel.generateThankYouEmail(notes)
+            },
+            onDismiss = { viewModel.showThankYou(false) }
         )
     }
 
@@ -658,68 +777,6 @@ fun ExternalUploadDialog(
 }
 
 @Composable
-fun ResumeSteeringDialog(
-    targetType: com.example.jobsearch.ai.GenerationRepository.Type?,
-    onConfirm: (String, String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var resumeText by remember { mutableStateOf("") }
-    var coverText by remember { mutableStateOf("") }
-
-    val showResumeField = targetType == com.example.jobsearch.ai.GenerationRepository.Type.RESUME || targetType == com.example.jobsearch.ai.GenerationRepository.Type.BOTH || targetType == null
-    val showCoverField = targetType == com.example.jobsearch.ai.GenerationRepository.Type.COVER || targetType == com.example.jobsearch.ai.GenerationRepository.Type.BOTH || targetType == null
-
-    val titleText = when (targetType) {
-        com.example.jobsearch.ai.GenerationRepository.Type.RESUME -> "Resume Steering"
-        com.example.jobsearch.ai.GenerationRepository.Type.COVER -> "Cover Letter Steering"
-        else -> "Document Steering"
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(titleText) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    "Optional: Add specific instructions to guide the AI tailoring.",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                if (showResumeField) {
-                    OutlinedTextField(
-                        value = resumeText,
-                        onValueChange = { resumeText = it },
-                        label = { Text("Resume Steering Instructions") },
-                        placeholder = { Text("e.g. 'Highlight project management'") },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 2
-                    )
-                }
-                if (showCoverField) {
-                    OutlinedTextField(
-                        value = coverText,
-                        onValueChange = { coverText = it },
-                        label = { Text("Cover Letter Steering Instructions") },
-                        placeholder = { Text("e.g. 'Focus on culture fit and passion'") },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 2
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            Button(onClick = { onConfirm(resumeText, coverText) }) {
-                Text("Generate")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
-}
-
-@Composable
 private fun JobHeader(
     job: Job,
     matchResult: JobDetailViewModel.MatchResult?,
@@ -762,11 +819,6 @@ private fun JobHeader(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                stringResource(R.string.added_label, DateFormatter.formatDate(job.dateAdded)),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
             TextButton(
                 onClick = onViewDescription,
                 modifier = Modifier.height(32.dp),
@@ -870,6 +922,13 @@ private fun StatusRow(state: JobDetailViewModel.UiState, viewModel: JobDetailVie
         if (job.status == JobStatus.APPLIED.name && job.dateApplied != null) {
             Text(
                 text = "Applied on ${DateFormatter.formatDate(job.dateApplied)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+        if (job.dateFollowedUp != null) {
+            Text(
+                text = "Followed up on ${DateFormatter.formatDate(job.dateFollowedUp)}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary
             )

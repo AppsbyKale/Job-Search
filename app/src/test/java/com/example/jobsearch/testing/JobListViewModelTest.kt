@@ -4,6 +4,7 @@ import com.example.jobsearch.data.InterviewRepository
 import com.example.jobsearch.data.Job
 import com.example.jobsearch.data.JobRepository
 import com.example.jobsearch.data.JobStatus
+import com.example.jobsearch.data.SettingsRepository
 import com.example.jobsearch.ui.joblist.JobListViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -30,11 +31,13 @@ class JobListViewModelTest {
 
     private val repository: JobRepository = mock()
     private val interviewRepository: InterviewRepository = mock()
+    private val settingsRepository: SettingsRepository = mock()
 
     private lateinit var viewModel: JobListViewModel
 
     private val allJobsFlow = MutableStateFlow<List<Job>>(emptyList())
     private val syncedJobsFlow = MutableStateFlow<List<Job>>(emptyList())
+    private val followupIntervalsFlow = MutableStateFlow("7, 14, 30")
 
     @Before
     fun setup() {
@@ -42,8 +45,9 @@ class JobListViewModelTest {
 
         whenever(repository.observeJobs()).thenReturn(allJobsFlow)
         whenever(repository.observeByStatus(JobStatus.SYNCED.name)).thenReturn(syncedJobsFlow)
+        whenever(settingsRepository.followupIntervals).thenReturn(followupIntervalsFlow)
 
-        viewModel = JobListViewModel(repository, interviewRepository)
+        viewModel = JobListViewModel(repository, interviewRepository, settingsRepository)
     }
 
     @After

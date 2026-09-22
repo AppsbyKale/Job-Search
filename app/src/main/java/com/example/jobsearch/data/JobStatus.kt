@@ -5,6 +5,7 @@ enum class JobStatus(val label: String) {
     SAVED("Saved"),
     APPLIED("Applied"),
     INTERVIEWING("Interviewing"),
+    INTERVIEWED("Interviewed"),
     OFFER("Offer"),
     REJECTED("Rejected"),
     ARCHIVED("Archived");

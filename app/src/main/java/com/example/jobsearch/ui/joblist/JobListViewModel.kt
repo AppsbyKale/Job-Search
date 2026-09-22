@@ -6,6 +6,7 @@ import com.example.jobsearch.data.Job
 import com.example.jobsearch.data.InterviewRepository
 import com.example.jobsearch.data.JobRepository
 import com.example.jobsearch.data.JobStatus
+import com.example.jobsearch.data.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,8 +29,43 @@ enum class SortOrder(val label: String) {
 @HiltViewModel
 class JobListViewModel @Inject constructor(
     private val repository: JobRepository,
-    private val interviewRepository: InterviewRepository
+    private val interviewRepository: InterviewRepository,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
+
+    val pendingFollowUps: StateFlow<List<Job>> = combine(
+        repository.observeJobs(),
+        settingsRepository.followupIntervals
+    ) { list, globalIntervalsStr ->
+        val now = System.currentTimeMillis()
+        list.filter { job ->
+            if (job.status != JobStatus.APPLIED.name || job.dateApplied == null) return@filter false
+            val intervalsStr = job.customFollowupIntervals?.takeIf { it.isNotBlank() } ?: globalIntervalsStr
+            val intervals = intervalsStr.split(",").map { it.trim().toIntOrNull() }.filterNotNull().sorted()
+            val daysElapsed = (now - job.dateApplied) / (24L * 60L * 60L * 1000L)
+            
+            val nextIntervalIndex = job.followupCount
+            if (nextIntervalIndex < intervals.size) {
+                val requiredDays = intervals[nextIntervalIndex]
+                daysElapsed >= requiredDays && job.dateFollowedUp == null
+            } else {
+                false
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun markFollowedUp(jobId: Long) {
+        viewModelScope.launch {
+            repository.getJob(jobId)?.let { job ->
+                repository.updateJob(
+                    job.copy(
+                        dateFollowedUp = System.currentTimeMillis(),
+                        followupCount = job.followupCount + 1
+                    )
+                )
+            }
+        }
+    }
 
     data class JobUiModel(
         val job: Job,
