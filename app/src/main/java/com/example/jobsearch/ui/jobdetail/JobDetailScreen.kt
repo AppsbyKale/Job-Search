@@ -207,7 +207,6 @@ fun JobDetailScreen(
                                 menuExpanded = false
                                 viewModel.showThankYou(true)
                             },
-                            leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) }
                         )
                         HorizontalDivider()
                         DropdownMenuItem(

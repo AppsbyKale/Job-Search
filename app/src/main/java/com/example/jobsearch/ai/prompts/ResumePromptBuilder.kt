@@ -68,10 +68,22 @@ object ResumePromptBuilder {
 
         val jobInfo = "TARGET JOB TO APPLY FOR (DO NOT list this as past work experience in the resume!):\nTitle: ${job.title}\nCompany: ${job.company}\nDescription: ${truncateWords(job.description, 200)}"
         
+        val atsCompliance = """
+            ### ATS COMPLIANCE ADD-ON
+            The following rules govern how the resume is written and structured so it parses correctly in Applicant Tracking Systems (Workday, Taleo, iCIMS, Greenhouse, Lever, etc.). When these conflict with stylistic instructions elsewhere, these rules win. They NEVER override factual accuracy — do not invent experience, skills, dates, or credentials.
+            KEYWORD MATCHING:
+            1. Mirror the job description's exact terminology for every skill, tool, and qualification the candidate genuinely has. If the JD says "RESTful APIs" and source says "REST APIs", use the JD's phrasing.
+            2. On first use of key terms, include both the acronym and the spelled-out form (e.g., "Search Engine Optimization (SEO)").
+            3. Include a dedicated "Skills" section as a simple comma-separated or bulleted list of relevant hard skills (highest-weighted section for keyword matching).
+            4. Keep the candidate's real job titles. Tailor bullet wording to the JD, never retitle roles to match it.
+            5. Every keyword must reflect genuine experience. Never insert JD keywords the candidate does not have.
+        """.trimIndent()
+
         val head = """
             Rewrite this resume using these facts. **IMPORTANT: Ensure ALL jobs and dates from the base resume are included in the tailored output. Each job must have between 2 and 10 bullet points.** 
             CRITICAL RULE: The target job above is the role the candidate is APPLYING FOR. DO NOT list this target company or role as past employment/experience in the resume's experience array. 
             JSON ONLY.
+            $atsCompliance
             $steering
             Facts:
             $distilledFacts
